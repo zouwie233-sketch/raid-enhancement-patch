@@ -26,7 +26,7 @@ import net.neoforged.fml.common.Mod;
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.0.4-bossbar-display-layer-hotfix-alpha";
+    public static final String VERSION = "0.9.0.5-bossbar-visible-authority-audit-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -46,7 +46,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". keeps the 0.9.0.3 RaidInstanceKey settlement fix and applies a display-layer-only BossBar client reattach / vanilla bar cleanup hotfix without changing settlement keys, raid waves, rewards, VillageFavor, villager gifts or Raids Enhanced rollback guard.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". keeps the 0.9.0.3 RaidInstanceKey settlement fix and runs a BossBar visible-authority audit with a temporary [REP] marker and diagnostic logging only; it does not change settlement keys, raid waves, rewards, VillageFavor, villager gifts, progress math or Raids Enhanced rollback guard.");
     }
 
     /**

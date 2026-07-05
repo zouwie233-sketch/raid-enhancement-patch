@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.0.4-bossbar-display-layer-hotfix-alpha"
+version="0.9.0.5-bossbar-visible-authority-audit-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.0.4 keeps the tested 0.9.0.3 RaidInstanceKey settlement fix and applies a BossBar display-layer hotfix only. The mod-owned raid BossBar now forces client reattach on wave refill/progress changes and more aggressively removes players from the vanilla Raid BossBar after hiding it. This stage does not modify settlement keys, VillageFavor, rewards, villager gifts, raid wave counts, RaidWaveAuthority, RaidWaveExpansionController or the wave-8 crash guard.
+Stage 0.9.0.5 keeps the tested 0.9.0.3 RaidInstanceKey settlement fix and turns BossBar work into a visible-authority audit only. The mod-owned raid BossBar may be temporarily marked with [REP] and writes independent/vanilla BossBar authority diagnostics to key_diagnostics.log. This stage does not modify settlement keys, VillageFavor, rewards, villager gifts, raid wave counts, RaidWaveAuthority, RaidWaveExpansionController, progress math or the wave-8 crash guard.
 '''
 
 [[mixins]]

@@ -21,7 +21,7 @@ public final class KeyDiagnosticsConfig {
     private KeyDiagnosticsConfig() {
     }
 
-    public static final String CONFIG_STAGE = "0.9.0.2-key-bossbar-diagnostics-logfile-alpha";
+    public static final String CONFIG_STAGE = "0.9.0.5-bossbar-visible-authority-audit-alpha";
 
     public static boolean ENABLED = false;
     public static boolean LOG_RAID_DISCOVERY = true;
@@ -31,6 +31,9 @@ public final class KeyDiagnosticsConfig {
     public static boolean LOG_STORAGE_PATHS = true;
     public static int LOG_INTERVAL_TICKS = 100;
     public static int MAX_PLAYER_KEYS_PER_LINE = 3;
+    public static boolean ENABLE_BOSSBAR_VISIBLE_AUTHORITY_AUDIT = true;
+    public static int BOSSBAR_VISIBLE_AUDIT_INTERVAL_TICKS = 20;
+    public static boolean ENABLE_TEMPORARY_REP_BOSSBAR_TITLE_MARKER = true;
 
     public static Path configDir() {
         return Path.of("config", "raid_enhancement_patch");
@@ -57,6 +60,9 @@ public final class KeyDiagnosticsConfig {
             LOG_STORAGE_PATHS = readBool(properties, "log.storagePaths", LOG_STORAGE_PATHS);
             LOG_INTERVAL_TICKS = readInt(properties, "log.intervalTicks", LOG_INTERVAL_TICKS, 20, 72000);
             MAX_PLAYER_KEYS_PER_LINE = readInt(properties, "log.maxPlayerKeysPerLine", MAX_PLAYER_KEYS_PER_LINE, 1, 12);
+            ENABLE_BOSSBAR_VISIBLE_AUTHORITY_AUDIT = readBool(properties, "bossbar.visibleAuthorityAudit.enabled", ENABLE_BOSSBAR_VISIBLE_AUTHORITY_AUDIT);
+            BOSSBAR_VISIBLE_AUDIT_INTERVAL_TICKS = readInt(properties, "bossbar.visibleAuthorityAudit.intervalTicks", BOSSBAR_VISIBLE_AUDIT_INTERVAL_TICKS, 20, 72000);
+            ENABLE_TEMPORARY_REP_BOSSBAR_TITLE_MARKER = readBool(properties, "bossbar.visibleAuthorityAudit.temporaryRepTitleMarker", ENABLE_TEMPORARY_REP_BOSSBAR_TITLE_MARKER);
             writeDefaultProperties(dir.resolve("key_diagnostics.default.properties"));
             if (ENABLED) {
                 System.out.println("[Raid Enhancement Patch] Loaded key diagnostics config " + CONFIG_STAGE
@@ -65,7 +71,10 @@ public final class KeyDiagnosticsConfig {
                         + ", favor=" + LOG_FAVOR
                         + ", bossbar=" + LOG_BOSSBAR
                         + ", storagePaths=" + LOG_STORAGE_PATHS
-                        + ", intervalTicks=" + LOG_INTERVAL_TICKS + ".");
+                        + ", intervalTicks=" + LOG_INTERVAL_TICKS
+                        + ", visibleAuthorityAudit=" + ENABLE_BOSSBAR_VISIBLE_AUTHORITY_AUDIT
+                        + ", visibleAuthorityAuditIntervalTicks=" + BOSSBAR_VISIBLE_AUDIT_INTERVAL_TICKS
+                        + ", temporaryRepTitleMarker=" + ENABLE_TEMPORARY_REP_BOSSBAR_TITLE_MARKER + ".");
             }
         } catch (Throwable throwable) {
             System.out.println("[Raid Enhancement Patch] Key diagnostics config load failed; diagnostics stay disabled: " + throwable);
@@ -124,6 +133,16 @@ public final class KeyDiagnosticsConfig {
                 "",
                 "# Avoid one very long settlement line when many players are eligible.",
                 "log.maxPlayerKeysPerLine=3",
+                "",
+                "# 0.9.0.5 BossBar visible-authority audit. Diagnostic-only; does not change raid settlement, rewards, waves or persistent data.",
+                "bossbar.visibleAuthorityAudit.enabled=true",
+                "",
+                "# Authority audit interval for repeated non-critical BossBar visibility/object lines.",
+                "bossbar.visibleAuthorityAudit.intervalTicks=20",
+                "",
+                "# Temporary visual marker. If enabled, the mod-owned independent BossBar title is prefixed with [REP].",
+                "# If the player does not see [REP], the visible bar is probably vanilla/Raids Enhanced/another object.",
+                "bossbar.visibleAuthorityAudit.temporaryRepTitleMarker=true",
                 ""
         );
         try (OutputStreamWriter writer = new OutputStreamWriter(Files.newOutputStream(file), StandardCharsets.UTF_8)) {

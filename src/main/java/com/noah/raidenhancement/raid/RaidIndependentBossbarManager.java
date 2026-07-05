@@ -1,8 +1,16 @@
 package com.noah.raidenhancement.raid;
 
+import com.noah.raidenhancement.config.KeyDiagnosticsConfig;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,7 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 0.8.9.9.8: independent raid bossbar presenter with dynamic per-wave progress.
+ * 0.9.0.5: independent raid bossbar visible-authority audit presenter.
  *
  * The previous UI path fought vanilla Raid's own ServerBossEvent#setName calls.
  * That reduced but could not eliminate title flicker. This manager creates one
@@ -35,6 +43,7 @@ public final class RaidIndependentBossbarManager {
     private static boolean warnedTickFailure;
     private static boolean warnedVanillaHideFailure;
     private static boolean announced;
+    private static boolean warnedAuthorityFileOutput;
 
     private static final long PLAYER_SYNC_INTERVAL_TICKS = 20L;
     private static final long CLEANUP_GRACE_TICKS = 80L;
@@ -52,7 +61,7 @@ public final class RaidIndependentBossbarManager {
             long gameTime = gameTime(serverLevel);
             if (!announced) {
                 announced = true;
-                System.out.println("[Raid Enhancement Patch] 0.9.0.4 independent raid BossBar display-layer hotfix is active. The mod-owned BossBar now forces client reattach on wave refill/progress changes and removes players from the vanilla Raid BossBar after hiding it.");
+                System.out.println("[Raid Enhancement Patch] 0.9.0.5 BossBar visible-authority audit is active. The mod-owned BossBar can be temporarily marked with [REP] and authority diagnostics are written to key_diagnostics.log. This stage does not change settlement keys, rewards, raid waves or progress math.");
             }
             List<RaidEncounterSnapshot> snapshots = RaidEncounterAuthority.snapshots();
             Set<String> activeKeys = new HashSet<>();
@@ -71,6 +80,7 @@ public final class RaidIndependentBossbarManager {
                     if (bar.bossEvent != null) {
                         RaidKeyDiagnostics.logBossbar("created", serverLevel, snapshot, gameTime, bar.lastWave,
                                 bar.waveBaselineRaiders, bar.lastAliveRaiders, bar.lastProgress);
+                        logAuthority("created", serverLevel, snapshot, bar, gameTime, true, "bossbar-created");
                     }
                 }
                 if (bar.bossEvent == null) {
@@ -86,7 +96,15 @@ public final class RaidIndependentBossbarManager {
                 if (visualRefreshRequired) {
                     forceClientReattach(bar, gameTime);
                 }
-                hideVanillaBossbar(snapshot.key());
+                if (bar.pendingPostWaveAuditGameTime > 0L
+                        && gameTime >= bar.pendingPostWaveAuditGameTime
+                        && snapshot.currentWave() == bar.pendingPostWaveAuditWave) {
+                    logAuthority("post-wave-next-tick", serverLevel, snapshot, bar, gameTime, true,
+                            "verify-progress-after-wave-change");
+                    bar.pendingPostWaveAuditGameTime = -1L;
+                    bar.pendingPostWaveAuditWave = -1;
+                }
+                hideVanillaBossbar(snapshot, bar, gameTime);
                 bar.lastSeenGameTime = gameTime;
             }
             cleanupInactive(activeKeys, gameTime);
@@ -101,7 +119,7 @@ public final class RaidIndependentBossbarManager {
     private static Object createBossEvent(RaidEncounterSnapshot snapshot, long gameTime) {
         try {
             Class<?> componentClass = Class.forName("net.minecraft.network.chat.Component");
-            Object title = component(componentClass, RaidBossbarTitleFormatter.format(snapshot, gameTime));
+            Object title = component(componentClass, diagnosticTitle(RaidBossbarTitleFormatter.format(snapshot, gameTime)));
             Class<?> colorClass = Class.forName("net.minecraft.world.BossEvent$BossBarColor");
             Class<?> overlayClass = Class.forName("net.minecraft.world.BossEvent$BossBarOverlay");
             Object color = enumValue(colorClass, "RED");
@@ -123,7 +141,7 @@ public final class RaidIndependentBossbarManager {
     }
 
     private static boolean updateBar(Object serverLevel, ManagedBossbar bar, RaidEncounterSnapshot snapshot, long gameTime) {
-        String title = RaidBossbarTitleFormatter.format(snapshot, gameTime);
+        String title = diagnosticTitle(RaidBossbarTitleFormatter.format(snapshot, gameTime));
         if (title != null && !title.equals(bar.lastTitle)) {
             Object component = component(title);
             if (component != null && invokeBestOneArg(bar.bossEvent, "setName", component)) {
@@ -144,6 +162,13 @@ public final class RaidIndependentBossbarManager {
                 bar.diagAlive, bar.diagNativeCount, bar.diagSessionCount, bar.diagNearbyCount,
                 bar.diagCountSource, bar.diagWaveChange, bar.diagBaselineReset, bar.diagRefillAttempt,
                 progressApplied, progress, bar.diagVanillaProgress, bar.diagDecision);
+        if (bar.diagWaveChange) {
+            bar.pendingPostWaveAuditGameTime = gameTime + 1L;
+            bar.pendingPostWaveAuditWave = snapshot.currentWave();
+        }
+        logAuthority("update", serverLevel, snapshot, bar, gameTime,
+                bar.diagWaveChange || bar.diagRefillAttempt || progressApplied,
+                "waveChange=" + bar.diagWaveChange + ",refillAttempt=" + bar.diagRefillAttempt + ",progressApplied=" + progressApplied);
         return bar.diagWaveChange || bar.diagRefillAttempt || progressApplied;
     }
 
@@ -591,19 +616,24 @@ public final class RaidIndependentBossbarManager {
             PLAYERS_SNAPSHOT.add(id);
             Object knownPlayer = bar.players.get(id);
             if (knownPlayer != null && knownPlayer != player) {
-                invokeBestOneArg(bar.bossEvent, "removePlayer", knownPlayer);
+                boolean removedKnown = invokeBestOneArg(bar.bossEvent, "removePlayer", knownPlayer);
                 bar.players.remove(id);
+                logAuthorityPlayer("remove-known-replaced-player", bar, id, knownPlayer, removedKnown, gameTime);
             }
             if (!bar.players.containsKey(id)) {
                 if (invokeBestOneArg(bar.bossEvent, "addPlayer", player)) {
                     bar.players.put(id, player);
+                    logAuthorityPlayer("add-player", bar, id, player, true, gameTime);
+                } else {
+                    logAuthorityPlayer("add-player-failed", bar, id, player, false, gameTime);
                 }
             }
         }
         List<String> toRemove = new ArrayList<>();
         for (Map.Entry<String, Object> entry : bar.players.entrySet()) {
             if (!PLAYERS_SNAPSHOT.contains(entry.getKey())) {
-                invokeBestOneArg(bar.bossEvent, "removePlayer", entry.getValue());
+                boolean removed = invokeBestOneArg(bar.bossEvent, "removePlayer", entry.getValue());
+                logAuthorityPlayer("remove-out-of-range-player", bar, entry.getKey(), entry.getValue(), removed, gameTime);
                 toRemove.add(entry.getKey());
             }
         }
@@ -635,11 +665,303 @@ public final class RaidIndependentBossbarManager {
             if (player == null) {
                 continue;
             }
-            invokeBestOneArg(bar.bossEvent, "removePlayer", player);
-            invokeBestOneArg(bar.bossEvent, "addPlayer", player);
+            boolean removed = invokeBestOneArg(bar.bossEvent, "removePlayer", player);
+            boolean added = invokeBestOneArg(bar.bossEvent, "addPlayer", player);
+            logAuthorityPlayer("client-reattach-remove-add", bar, playerIdentity(player), player, removed && added, gameTime);
         }
         invokeOneArg(bar.bossEvent, "setVisible", boolean.class, true);
         bar.lastClientReattachGameTime = gameTime;
+    }
+
+
+    private static String diagnosticTitle(String title) {
+        String base = title == null ? "" : title;
+        if (!KeyDiagnosticsConfig.ENABLE_TEMPORARY_REP_BOSSBAR_TITLE_MARKER) {
+            return base;
+        }
+        return base.startsWith("[REP]") ? base : "[REP] " + base;
+    }
+
+    private static void logAuthority(String phase, Object serverLevel, RaidEncounterSnapshot snapshot,
+                                     ManagedBossbar bar, long gameTime, boolean critical, String note) {
+        if (!KeyDiagnosticsConfig.ENABLED
+                || !KeyDiagnosticsConfig.LOG_BOSSBAR
+                || !KeyDiagnosticsConfig.ENABLE_BOSSBAR_VISIBLE_AUTHORITY_AUDIT) {
+            return;
+        }
+        if (!critical && bar != null && bar.lastAuthorityAuditGameTime > 0L
+                && gameTime - bar.lastAuthorityAuditGameTime < Math.max(20L, KeyDiagnosticsConfig.BOSSBAR_VISIBLE_AUDIT_INTERVAL_TICKS)) {
+            return;
+        }
+        if (bar != null) {
+            bar.lastAuthorityAuditGameTime = gameTime;
+        }
+        Object independent = bar == null ? null : bar.bossEvent;
+        Object vanilla = vanillaBossEvent(snapshot == null ? null : snapshot.key());
+        String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
+                + "phase=" + safeText(phase)
+                + " version=0.9.0.5-bossbar-visible-authority-audit-alpha"
+                + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
+                + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
+                + " snapshot.key=" + safeText(snapshot == null ? null : snapshot.key())
+                + " wave=" + (snapshot == null ? -1 : snapshot.currentWave())
+                + " totalWaves=" + (snapshot == null ? -1 : snapshot.totalWaves())
+                + " markerEnabled=" + KeyDiagnosticsConfig.ENABLE_TEMPORARY_REP_BOSSBAR_TITLE_MARKER
+                + " visibleAuthorityQuestion=does-player-see-[REP]"
+                + " independentIdentity=" + bossEventIdentity(independent)
+                + " independentTitle=" + safeText(bossEventTitle(independent))
+                + " independentProgress=" + progressText(readBossEventProgressOrNaN(independent))
+                + " independentVisible=" + bossEventVisible(independent)
+                + " independentPlayerCount=" + bossEventPlayerCount(independent)
+                + " independentTrackedPlayerCount=" + (bar == null ? -1 : bar.players.size())
+                + " independentTrackedPlayers=" + trackedPlayerSummary(bar)
+                + " vanillaIdentity=" + bossEventIdentity(vanilla)
+                + " vanillaTitle=" + safeText(bossEventTitle(vanilla))
+                + " vanillaProgress=" + progressText(readBossEventProgressOrNaN(vanilla))
+                + " vanillaVisible=" + bossEventVisible(vanilla)
+                + " vanillaPlayerCount=" + bossEventPlayerCount(vanilla)
+                + " barLastWave=" + (bar == null ? -1 : bar.lastWave)
+                + " barLastProgress=" + (bar == null ? "nan" : progressText(bar.lastProgress))
+                + " diagWaveChange=" + (bar != null && bar.diagWaveChange)
+                + " diagRefillAttempt=" + (bar != null && bar.diagRefillAttempt)
+                + " gameTime=" + gameTime
+                + " levelDimension=" + dimensionIdForAudit(serverLevel)
+                + " note=" + safeText(note) + ".";
+        System.out.println(line);
+        appendAuthorityDiagnosticFile(line);
+    }
+
+    private static void logAuthorityPlayer(String phase, ManagedBossbar bar, String id, Object player, boolean success, long gameTime) {
+        if (!KeyDiagnosticsConfig.ENABLED
+                || !KeyDiagnosticsConfig.LOG_BOSSBAR
+                || !KeyDiagnosticsConfig.ENABLE_BOSSBAR_VISIBLE_AUTHORITY_AUDIT) {
+            return;
+        }
+        String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
+                + "phase=" + safeText(phase)
+                + " version=0.9.0.5-bossbar-visible-authority-audit-alpha"
+                + " playerKey=" + safeText(id)
+                + " player=" + safeText(playerDisplay(player))
+                + " success=" + success
+                + " independentIdentity=" + bossEventIdentity(bar == null ? null : bar.bossEvent)
+                + " independentPlayerCount=" + bossEventPlayerCount(bar == null ? null : bar.bossEvent)
+                + " independentTrackedPlayerCount=" + (bar == null ? -1 : bar.players.size())
+                + " gameTime=" + gameTime
+                + " note=player-binding-audit.";
+        System.out.println(line);
+        appendAuthorityDiagnosticFile(line);
+    }
+
+    private static void appendAuthorityDiagnosticFile(String line) {
+        try {
+            Path dir = KeyDiagnosticsConfig.configDir();
+            Files.createDirectories(dir);
+            Path file = dir.resolve("key_diagnostics.log");
+            Files.writeString(file, Instant.now() + " " + line + System.lineSeparator(), StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND, StandardOpenOption.WRITE);
+        } catch (Throwable throwable) {
+            if (!warnedAuthorityFileOutput) {
+                warnedAuthorityFileOutput = true;
+                System.out.println("[Raid Enhancement Patch] BossBar authority audit file output failed once: " + throwable);
+            }
+        }
+    }
+
+    private static Object vanillaBossEvent(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        try {
+            Object state = stateByKey(key);
+            Object nativeRaid = state == null ? null : readObject(state, "nativeRaid");
+            return findServerBossEvent(nativeRaid);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static float readBossEventProgressOrNaN(Object bossEvent) {
+        Float value = readBossEventProgress(bossEvent);
+        return value == null ? Float.NaN : value;
+    }
+
+    private static String bossEventTitle(Object bossEvent) {
+        if (bossEvent == null) {
+            return "null";
+        }
+        Object value = invokeNoArgValue(bossEvent, "getName");
+        if (value == null) {
+            value = invokeNoArgValue(bossEvent, "getDisplayName");
+        }
+        return value == null ? "unknown" : String.valueOf(value);
+    }
+
+    private static boolean bossEventVisible(Object bossEvent) {
+        if (bossEvent == null) {
+            return false;
+        }
+        Object value = invokeNoArgValue(bossEvent, "isVisible");
+        if (value instanceof Boolean b) {
+            return b;
+        }
+        value = invokeNoArgValue(bossEvent, "getVisible");
+        if (value instanceof Boolean b) {
+            return b;
+        }
+        Boolean reflected = readBooleanField(bossEvent, "visible");
+        return reflected != null && reflected;
+    }
+
+    private static Boolean readBooleanField(Object target, String expectedNamePart) {
+        if (target == null) {
+            return null;
+        }
+        Class<?> current = target.getClass();
+        while (current != null && current != Object.class) {
+            for (Field field : current.getDeclaredFields()) {
+                try {
+                    Class<?> type = field.getType();
+                    if (type != boolean.class && type != Boolean.class) {
+                        continue;
+                    }
+                    String name = field.getName() == null ? "" : field.getName().toLowerCase(java.util.Locale.ROOT);
+                    if (expectedNamePart != null && !name.contains(expectedNamePart.toLowerCase(java.util.Locale.ROOT))) {
+                        continue;
+                    }
+                    field.setAccessible(true);
+                    Object value = field.get(target);
+                    if (value instanceof Boolean b) {
+                        return b;
+                    }
+                } catch (Throwable ignored) {
+                    // Try next field.
+                }
+            }
+            current = current.getSuperclass();
+        }
+        return null;
+    }
+
+    private static int bossEventPlayerCount(Object bossEvent) {
+        if (bossEvent == null) {
+            return -1;
+        }
+        Object value = invokeNoArgValue(bossEvent, "getPlayers");
+        if (value instanceof Collection<?> collection) {
+            return collection.size();
+        }
+        Integer reflected = reflectedPlayerCollectionSize(bossEvent);
+        return reflected == null ? -1 : reflected;
+    }
+
+    private static Integer reflectedPlayerCollectionSize(Object target) {
+        if (target == null) {
+            return null;
+        }
+        Class<?> current = target.getClass();
+        while (current != null && current != Object.class) {
+            for (Field field : current.getDeclaredFields()) {
+                try {
+                    field.setAccessible(true);
+                    Object value = field.get(target);
+                    if (value instanceof Collection<?> collection && looksLikePlayerCollection(collection)) {
+                        return collection.size();
+                    }
+                } catch (Throwable ignored) {
+                    // Try next field.
+                }
+            }
+            current = current.getSuperclass();
+        }
+        return null;
+    }
+
+    private static boolean looksLikePlayerCollection(Collection<?> collection) {
+        if (collection == null || collection.isEmpty()) {
+            return true;
+        }
+        int checked = 0;
+        for (Object element : collection) {
+            if (element == null) {
+                continue;
+            }
+            String name = element.getClass().getName();
+            if (name.contains("ServerPlayer") || name.contains("Player") || invokeNoArgValue(element, "getUUID") != null) {
+                return true;
+            }
+            if (++checked >= 3) {
+                break;
+            }
+        }
+        return false;
+    }
+
+    private static String bossEventIdentity(Object bossEvent) {
+        return bossEvent == null ? "null" : bossEvent.getClass().getName() + "@" + System.identityHashCode(bossEvent);
+    }
+
+    private static String trackedPlayerSummary(ManagedBossbar bar) {
+        if (bar == null || bar.players.isEmpty()) {
+            return "[]";
+        }
+        StringBuilder builder = new StringBuilder("[");
+        int count = 0;
+        for (String key : bar.players.keySet()) {
+            if (count > 0) {
+                builder.append(',');
+            }
+            if (count >= 3) {
+                builder.append("...+").append(bar.players.size() - count).append(" more");
+                break;
+            }
+            builder.append(key);
+            count++;
+        }
+        builder.append(']');
+        return builder.toString();
+    }
+
+    private static String playerDisplay(Object player) {
+        if (player == null) {
+            return "null";
+        }
+        Object name = invokeNoArgValue(player, "getGameProfile");
+        if (name != null) {
+            return String.valueOf(name);
+        }
+        name = invokeNoArgValue(player, "getName");
+        if (name != null) {
+            return String.valueOf(name);
+        }
+        return player.getClass().getName() + "@" + System.identityHashCode(player);
+    }
+
+    private static String safeText(String value) {
+        if (value == null) {
+            return "null";
+        }
+        return value.replace('\n', '_').replace('\r', '_');
+    }
+
+
+    private static String progressText(float value) {
+        if (Float.isNaN(value) || Float.isInfinite(value)) {
+            return "nan";
+        }
+        return String.format(java.util.Locale.ROOT, "%.4f", value);
+    }
+
+    private static String dimensionIdForAudit(Object level) {
+        if (level == null) {
+            return "null";
+        }
+        try {
+            Object dimension = invokeNoArgValue(level, "dimension");
+            Object location = dimension == null ? null : invokeNoArgValue(dimension, "location");
+            return location == null ? String.valueOf(dimension) : String.valueOf(location);
+        } catch (Throwable ignored) {
+            return "unknown";
+        }
     }
 
     private static void cleanupInactive(Set<String> activeKeys, long gameTime) {
@@ -662,7 +984,8 @@ public final class RaidIndependentBossbarManager {
         }
     }
 
-    private static void hideVanillaBossbar(String key) {
+    private static void hideVanillaBossbar(RaidEncounterSnapshot snapshot, ManagedBossbar bar, long gameTime) {
+        String key = snapshot == null ? null : snapshot.key();
         if (key == null || key.isBlank()) {
             return;
         }
@@ -676,15 +999,26 @@ public final class RaidIndependentBossbarManager {
             if (bossEvent == null) {
                 return;
             }
+            int beforePlayers = bossEventPlayerCount(bossEvent);
+            float beforeProgress = readBossEventProgress(bossEvent) == null ? Float.NaN : readBossEventProgress(bossEvent);
+            boolean beforeVisible = bossEventVisible(bossEvent);
             boolean hidden = invokeOneArg(bossEvent, "setVisible", boolean.class, false);
-            // 0.9.0.4: do not leave clients bound to the original Raid BossBar.
-            // setVisible(false) sends a remove packet, but the vanilla ServerBossEvent
-            // may keep its player set internally and can visually fight the mod-owned
-            // bar when the next wave starts. Removing players is a display-only cleanup.
+            // 0.9.0.4 baseline behavior retained for diagnosis: do not leave clients bound
+            // to the original Raid BossBar after it is hidden. 0.9.0.5 does not add a
+            // second-layer reattach/sync fix; it records whether this object still has players.
             boolean removed = invokeNoArg(bossEvent, "removeAllPlayers");
             if (!hidden && !removed) {
                 invokeOneArg(bossEvent, "setVisible", boolean.class, false);
             }
+            logAuthority("hide-vanilla", null, snapshot, bar, gameTime, true,
+                    "vanillaIdentity=" + bossEventIdentity(bossEvent)
+                            + ",beforeVisible=" + beforeVisible
+                            + ",beforeProgress=" + progressText(beforeProgress)
+                            + ",beforePlayers=" + beforePlayers
+                            + ",setVisibleFalse=" + hidden
+                            + ",removeAllPlayers=" + removed
+                            + ",afterVisible=" + bossEventVisible(bossEvent)
+                            + ",afterPlayers=" + bossEventPlayerCount(bossEvent));
         } catch (Throwable throwable) {
             if (!warnedVanillaHideFailure) {
                 warnedVanillaHideFailure = true;
@@ -1001,6 +1335,9 @@ public final class RaidIndependentBossbarManager {
         long lastNearbyScanGameTime;
         int lastNearbyScanCount = -1;
         long lastClientReattachGameTime;
+        long lastAuthorityAuditGameTime = -1L;
+        long pendingPostWaveAuditGameTime = -1L;
+        int pendingPostWaveAuditWave = -1;
         int diagPreviousLastWave = -1;
         boolean diagWaveChange;
         boolean diagBaselineReset;

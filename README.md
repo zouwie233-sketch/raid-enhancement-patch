@@ -1,5 +1,11 @@
 # Raid Enhancement Patch
 
+Current diagnostic stage: `0.9.0.5-bossbar-visible-authority-audit-alpha`.
+
+This stage keeps the tested 0.9.0.3 RaidInstanceKey settlement fix and audits BossBar visible authority with a temporary `[REP]` marker. It is not a stable release and not a final BossBar fix.
+
+# Raid Enhancement Patch
+
 当前开发版本：`0.9.0.4-bossbar-display-layer-hotfix-alpha`
 
 ## 当前版本定位
