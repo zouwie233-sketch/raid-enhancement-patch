@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.0.5-bossbar-visible-authority-audit-alpha"
+version="0.9.0.6-bossbar-end-cleanup-and-refill-polish-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.0.5 keeps the tested 0.9.0.3 RaidInstanceKey settlement fix and turns BossBar work into a visible-authority audit only. The mod-owned raid BossBar may be temporarily marked with [REP] and writes independent/vanilla BossBar authority diagnostics to key_diagnostics.log. This stage does not modify settlement keys, VillageFavor, rewards, villager gifts, raid wave counts, RaidWaveAuthority, RaidWaveExpansionController, progress math or the wave-8 crash guard.
+Stage 0.9.0.6 keeps the tested 0.9.0.3 RaidInstanceKey settlement fix and polishes the already-confirmed [REP] independent BossBar path. It adds BossBarCleanupAudit diagnostics, immediate REP-bar completion cleanup, a short post-completion vanilla BossBar suppression window, and same-wave upward refill suppression to reduce visible mid-wave jumps. This stage does not modify settlement keys, VillageFavor, rewards, villager gifts, raid wave counts, RaidWaveAuthority, RaidWaveExpansionController, the core progress algorithm, persistent data, or the wave-8 crash guard.
 '''
 
 [[mixins]]

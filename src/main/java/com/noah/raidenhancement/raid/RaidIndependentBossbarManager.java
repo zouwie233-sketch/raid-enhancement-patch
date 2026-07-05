@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 0.9.0.5: independent raid bossbar visible-authority audit presenter.
+ * 0.9.0.6: independent raid bossbar end-cleanup and refill polish presenter.
  *
  * The previous UI path fought vanilla Raid's own ServerBossEvent#setName calls.
  * That reduced but could not eliminate title flicker. This manager creates one
@@ -46,7 +46,9 @@ public final class RaidIndependentBossbarManager {
     private static boolean warnedAuthorityFileOutput;
 
     private static final long PLAYER_SYNC_INTERVAL_TICKS = 20L;
-    private static final long CLEANUP_GRACE_TICKS = 80L;
+    private static final long CLEANUP_GRACE_TICKS = 140L;
+    private static final long COMPLETED_VANILLA_SUPPRESS_TICKS = 120L;
+    private static final long CLEANUP_AUDIT_INTERVAL_TICKS = 20L;
     private static final long CLIENT_REATTACH_INTERVAL_TICKS = 20L;
     private static final double PLAYER_RADIUS_SQ = 128.0D * 128.0D;
 
@@ -61,7 +63,7 @@ public final class RaidIndependentBossbarManager {
             long gameTime = gameTime(serverLevel);
             if (!announced) {
                 announced = true;
-                System.out.println("[Raid Enhancement Patch] 0.9.0.5 BossBar visible-authority audit is active. The mod-owned BossBar can be temporarily marked with [REP] and authority diagnostics are written to key_diagnostics.log. This stage does not change settlement keys, rewards, raid waves or progress math.");
+                System.out.println("[Raid Enhancement Patch] 0.9.0.6 BossBar end-cleanup and refill-polish stage is active. The mod-owned BossBar keeps the temporary [REP] marker, suppresses vanilla BossBar during the completion cleanup window, and writes BossBarCleanupAudit diagnostics. This stage does not change settlement keys, rewards, raid waves or progress math.");
             }
             List<RaidEncounterSnapshot> snapshots = RaidEncounterAuthority.snapshots();
             Set<String> activeKeys = new HashSet<>();
@@ -74,6 +76,10 @@ public final class RaidIndependentBossbarManager {
                 }
                 activeKeys.add(snapshot.key());
                 ManagedBossbar bar = BARS.computeIfAbsent(snapshot.key(), key -> new ManagedBossbar());
+                bar.lastSnapshot = snapshot;
+                bar.inactiveSinceGameTime = -1L;
+                bar.independentCleanupDone = false;
+                bar.cleanupSuppressUntilGameTime = -1L;
                 if (bar.bossEvent == null) {
                     bar.bossEvent = createBossEvent(snapshot, gameTime);
                     bar.createdGameTime = gameTime;
@@ -107,7 +113,7 @@ public final class RaidIndependentBossbarManager {
                 hideVanillaBossbar(snapshot, bar, gameTime);
                 bar.lastSeenGameTime = gameTime;
             }
-            cleanupInactive(activeKeys, gameTime);
+            cleanupInactive(activeKeys, serverLevel, gameTime);
         } catch (Throwable throwable) {
             if (!warnedTickFailure) {
                 warnedTickFailure = true;
@@ -258,12 +264,19 @@ public final class RaidIndependentBossbarManager {
     private static float finishProgressDiagnostic(ManagedBossbar bar, float computed, float previousDisplayedProgress,
                                                   String decision, float vanillaProgress) {
         float progress = clampProgress(computed);
+        boolean sameWaveUpwardRefill = !bar.diagWaveChange
+                && previousDisplayedProgress >= 0.0F
+                && progress > previousDisplayedProgress + 0.005F;
+        if (sameWaveUpwardRefill) {
+            progress = clampProgress(previousDisplayedProgress);
+            decision = decision + "+same-wave-refill-suppressed";
+        }
         bar.diagComputedProgress = progress;
         bar.diagVanillaProgress = vanillaProgress;
         bar.diagDecision = decision;
         bar.diagRefillAttempt = bar.diagWaveChange
                 || previousDisplayedProgress < 0.0F
-                || progress > previousDisplayedProgress + 0.005F;
+                || (!sameWaveUpwardRefill && progress > previousDisplayedProgress + 0.005F);
         return progress;
     }
 
@@ -700,7 +713,7 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(snapshot == null ? null : snapshot.key());
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.0.5-bossbar-visible-authority-audit-alpha"
+                + " version=0.9.0.6-bossbar-end-cleanup-and-refill-polish-alpha"
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(snapshot == null ? null : snapshot.key())
@@ -739,7 +752,7 @@ public final class RaidIndependentBossbarManager {
         }
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.0.5-bossbar-visible-authority-audit-alpha"
+                + " version=0.9.0.6-bossbar-end-cleanup-and-refill-polish-alpha"
                 + " playerKey=" + safeText(id)
                 + " player=" + safeText(playerDisplay(player))
                 + " success=" + success
@@ -964,7 +977,7 @@ public final class RaidIndependentBossbarManager {
         }
     }
 
-    private static void cleanupInactive(Set<String> activeKeys, long gameTime) {
+    private static void cleanupInactive(Set<String> activeKeys, Object serverLevel, long gameTime) {
         List<String> remove = new ArrayList<>();
         for (Map.Entry<String, ManagedBossbar> entry : BARS.entrySet()) {
             String key = entry.getKey();
@@ -972,16 +985,119 @@ public final class RaidIndependentBossbarManager {
             if (activeKeys.contains(key)) {
                 continue;
             }
-            if (bar == null || gameTime - bar.lastSeenGameTime >= CLEANUP_GRACE_TICKS) {
+            if (bar == null) {
+                remove.add(key);
+                continue;
+            }
+            RaidEncounterSnapshot snapshot = bar.lastSnapshot;
+            if (bar.inactiveSinceGameTime <= 0L) {
+                bar.inactiveSinceGameTime = gameTime;
+                bar.cleanupSuppressUntilGameTime = gameTime + COMPLETED_VANILLA_SUPPRESS_TICKS;
+                logCleanup("inactive-detected", serverLevel, key, snapshot, bar, gameTime, true,
+                        "snapshot-removed-or-raid-completed;start-completion-cleanup-window");
+            }
+            if (!bar.independentCleanupDone) {
+                removeAllPlayers(bar.bossEvent, bar.players);
+                bar.independentCleanupDone = true;
+                logCleanup("remove-independent-completed", serverLevel, key, snapshot, bar, gameTime, true,
+                        "removed-[REP]-bossbar-players-and-set-visible-false");
+            }
+            if (gameTime <= bar.cleanupSuppressUntilGameTime) {
+                boolean shouldSuppress = bar.lastVanillaSuppressGameTime <= 0L
+                        || gameTime - bar.lastVanillaSuppressGameTime >= CLEANUP_AUDIT_INTERVAL_TICKS;
+                if (shouldSuppress) {
+                    suppressVanillaForCleanup(serverLevel, key, snapshot, bar, gameTime,
+                            "completion-window-vanilla-suppress");
+                    bar.lastVanillaSuppressGameTime = gameTime;
+                } else {
+                    suppressVanillaForCleanup(serverLevel, key, snapshot, bar, gameTime,
+                            "completion-window-vanilla-suppress-throttled-no-log");
+                }
+            }
+            if (gameTime - bar.inactiveSinceGameTime >= CLEANUP_GRACE_TICKS) {
+                suppressVanillaForCleanup(serverLevel, key, snapshot, bar, gameTime,
+                        "final-vanilla-suppress-before-bar-entry-removal");
+                logCleanup("cleanup-window-finished", serverLevel, key, snapshot, bar, gameTime, true,
+                        "removing-managed-bossbar-entry-after-completion-grace");
                 remove.add(key);
             }
         }
         for (String key : remove) {
-            ManagedBossbar bar = BARS.remove(key);
-            if (bar != null) {
-                removeAllPlayers(bar.bossEvent, bar.players);
+            BARS.remove(key);
+        }
+    }
+
+    private static void suppressVanillaForCleanup(Object serverLevel, String key, RaidEncounterSnapshot snapshot,
+                                                  ManagedBossbar bar, long gameTime, String note) {
+        Object bossEvent = vanillaBossEvent(key);
+        int beforePlayers = bossEventPlayerCount(bossEvent);
+        float beforeProgress = readBossEventProgressOrNaN(bossEvent);
+        boolean beforeVisible = bossEventVisible(bossEvent);
+        boolean hidden = false;
+        boolean removed = false;
+        if (bossEvent != null) {
+            hidden = invokeOneArg(bossEvent, "setVisible", boolean.class, false);
+            removed = invokeNoArg(bossEvent, "removeAllPlayers");
+            if (!hidden && !removed) {
+                invokeOneArg(bossEvent, "setVisible", boolean.class, false);
             }
         }
+        if (!"completion-window-vanilla-suppress-throttled-no-log".equals(note)) {
+            logCleanup("suppress-vanilla-after-completed", serverLevel, key, snapshot, bar, gameTime, true,
+                    "vanillaIdentity=" + bossEventIdentity(bossEvent)
+                            + ",beforeVisible=" + beforeVisible
+                            + ",beforeProgress=" + progressText(beforeProgress)
+                            + ",beforePlayers=" + beforePlayers
+                            + ",setVisibleFalse=" + hidden
+                            + ",removeAllPlayers=" + removed
+                            + ",afterVisible=" + bossEventVisible(bossEvent)
+                            + ",afterPlayers=" + bossEventPlayerCount(bossEvent)
+                            + ",note=" + note);
+        }
+    }
+
+    private static void logCleanup(String phase, Object serverLevel, String key, RaidEncounterSnapshot snapshot,
+                                   ManagedBossbar bar, long gameTime, boolean critical, String note) {
+        if (!KeyDiagnosticsConfig.ENABLED
+                || !KeyDiagnosticsConfig.LOG_BOSSBAR
+                || !KeyDiagnosticsConfig.ENABLE_BOSSBAR_VISIBLE_AUTHORITY_AUDIT) {
+            return;
+        }
+        if (!critical && bar != null && bar.lastCleanupAuditGameTime > 0L
+                && gameTime - bar.lastCleanupAuditGameTime < CLEANUP_AUDIT_INTERVAL_TICKS) {
+            return;
+        }
+        if (bar != null) {
+            bar.lastCleanupAuditGameTime = gameTime;
+        }
+        Object independent = bar == null ? null : bar.bossEvent;
+        Object vanilla = vanillaBossEvent(key);
+        String line = "[Raid Enhancement Patch][KeyDiag][BossBarCleanupAudit] "
+                + "phase=" + safeText(phase)
+                + " version=0.9.0.6-bossbar-end-cleanup-and-refill-polish-alpha"
+                + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
+                + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
+                + " snapshot.key=" + safeText(key)
+                + " wave=" + (snapshot == null ? -1 : snapshot.currentWave())
+                + " totalWaves=" + (snapshot == null ? -1 : snapshot.totalWaves())
+                + " independentIdentity=" + bossEventIdentity(independent)
+                + " independentTitle=" + safeText(bossEventTitle(independent))
+                + " independentProgress=" + progressText(readBossEventProgressOrNaN(independent))
+                + " independentVisible=" + bossEventVisible(independent)
+                + " independentPlayerCount=" + bossEventPlayerCount(independent)
+                + " independentTrackedPlayerCount=" + (bar == null ? -1 : bar.players.size())
+                + " vanillaIdentity=" + bossEventIdentity(vanilla)
+                + " vanillaTitle=" + safeText(bossEventTitle(vanilla))
+                + " vanillaProgress=" + progressText(readBossEventProgressOrNaN(vanilla))
+                + " vanillaVisible=" + bossEventVisible(vanilla)
+                + " vanillaPlayerCount=" + bossEventPlayerCount(vanilla)
+                + " inactiveSince=" + (bar == null ? -1 : bar.inactiveSinceGameTime)
+                + " suppressUntil=" + (bar == null ? -1 : bar.cleanupSuppressUntilGameTime)
+                + " gameTime=" + gameTime
+                + " levelDimension=" + dimensionIdForAudit(serverLevel)
+                + " note=" + safeText(note) + ".";
+        System.out.println(line);
+        appendAuthorityDiagnosticFile(line);
     }
 
     private static void hideVanillaBossbar(RaidEncounterSnapshot snapshot, ManagedBossbar bar, long gameTime) {
@@ -1338,6 +1454,12 @@ public final class RaidIndependentBossbarManager {
         long lastAuthorityAuditGameTime = -1L;
         long pendingPostWaveAuditGameTime = -1L;
         int pendingPostWaveAuditWave = -1;
+        RaidEncounterSnapshot lastSnapshot;
+        long inactiveSinceGameTime = -1L;
+        long cleanupSuppressUntilGameTime = -1L;
+        long lastVanillaSuppressGameTime = -1L;
+        long lastCleanupAuditGameTime = -1L;
+        boolean independentCleanupDone;
         int diagPreviousLastWave = -1;
         boolean diagWaveChange;
         boolean diagBaselineReset;
