@@ -38,6 +38,7 @@ public final class RaidIndependentBossbarManager {
 
     private static final long PLAYER_SYNC_INTERVAL_TICKS = 20L;
     private static final long CLEANUP_GRACE_TICKS = 80L;
+    private static final long CLIENT_REATTACH_INTERVAL_TICKS = 20L;
     private static final double PLAYER_RADIUS_SQ = 128.0D * 128.0D;
 
     private RaidIndependentBossbarManager() {
@@ -51,7 +52,7 @@ public final class RaidIndependentBossbarManager {
             long gameTime = gameTime(serverLevel);
             if (!announced) {
                 announced = true;
-                System.out.println("[Raid Enhancement Patch] 0.8.9.9.6 independent raid BossBar presenter is active. Vanilla raid BossBar is hidden only after the mod-owned BossBar is created; player sync is throttled for performance.");
+                System.out.println("[Raid Enhancement Patch] 0.9.0.4 independent raid BossBar display-layer hotfix is active. The mod-owned BossBar now forces client reattach on wave refill/progress changes and removes players from the vanilla Raid BossBar after hiding it.");
             }
             List<RaidEncounterSnapshot> snapshots = RaidEncounterAuthority.snapshots();
             Set<String> activeKeys = new HashSet<>();
@@ -76,10 +77,14 @@ public final class RaidIndependentBossbarManager {
                     // Do not hide vanilla if the replacement bar could not be built.
                     continue;
                 }
-                updateBar(serverLevel, bar, snapshot, gameTime);
-                if (bar.lastPlayerSyncGameTime <= 0L
+                boolean visualRefreshRequired = updateBar(serverLevel, bar, snapshot, gameTime);
+                if (visualRefreshRequired
+                        || bar.lastPlayerSyncGameTime <= 0L
                         || gameTime - bar.lastPlayerSyncGameTime >= PLAYER_SYNC_INTERVAL_TICKS) {
                     syncPlayers(serverLevel, bar, snapshot, gameTime);
+                }
+                if (visualRefreshRequired) {
+                    forceClientReattach(bar, gameTime);
                 }
                 hideVanillaBossbar(snapshot.key());
                 bar.lastSeenGameTime = gameTime;
@@ -117,7 +122,7 @@ public final class RaidIndependentBossbarManager {
         }
     }
 
-    private static void updateBar(Object serverLevel, ManagedBossbar bar, RaidEncounterSnapshot snapshot, long gameTime) {
+    private static boolean updateBar(Object serverLevel, ManagedBossbar bar, RaidEncounterSnapshot snapshot, long gameTime) {
         String title = RaidBossbarTitleFormatter.format(snapshot, gameTime);
         if (title != null && !title.equals(bar.lastTitle)) {
             Object component = component(title);
@@ -139,6 +144,7 @@ public final class RaidIndependentBossbarManager {
                 bar.diagAlive, bar.diagNativeCount, bar.diagSessionCount, bar.diagNearbyCount,
                 bar.diagCountSource, bar.diagWaveChange, bar.diagBaselineReset, bar.diagRefillAttempt,
                 progressApplied, progress, bar.diagVanillaProgress, bar.diagDecision);
+        return bar.diagWaveChange || bar.diagRefillAttempt || progressApplied;
     }
 
     private static float progress(Object serverLevel, RaidEncounterSnapshot snapshot, String key, ManagedBossbar bar, long gameTime) {
@@ -583,6 +589,11 @@ public final class RaidIndependentBossbarManager {
                 continue;
             }
             PLAYERS_SNAPSHOT.add(id);
+            Object knownPlayer = bar.players.get(id);
+            if (knownPlayer != null && knownPlayer != player) {
+                invokeBestOneArg(bar.bossEvent, "removePlayer", knownPlayer);
+                bar.players.remove(id);
+            }
             if (!bar.players.containsKey(id)) {
                 if (invokeBestOneArg(bar.bossEvent, "addPlayer", player)) {
                     bar.players.put(id, player);
@@ -600,6 +611,35 @@ public final class RaidIndependentBossbarManager {
             bar.players.remove(id);
         }
         bar.lastPlayerSyncGameTime = gameTime;
+    }
+
+    /**
+     * 0.9.0.4 display-layer hotfix: when progress refills or a new wave starts,
+     * force a remove/add cycle for players already attached to the mod-owned
+     * ServerBossEvent. Diagnostics from 0.9.0.3 showed setProgress succeeded on
+     * the server object while the client-visible bar stayed stale, so this is a
+     * presentation sync repair only; it does not change wave math, raider counts,
+     * settlement keys, rewards or raid flow.
+     */
+    private static void forceClientReattach(ManagedBossbar bar, long gameTime) {
+        if (bar == null || bar.bossEvent == null || bar.players.isEmpty()) {
+            return;
+        }
+        if (bar.lastClientReattachGameTime > 0L
+                && gameTime - bar.lastClientReattachGameTime < CLIENT_REATTACH_INTERVAL_TICKS
+                && !bar.diagWaveChange) {
+            return;
+        }
+        List<Object> players = new ArrayList<>(bar.players.values());
+        for (Object player : players) {
+            if (player == null) {
+                continue;
+            }
+            invokeBestOneArg(bar.bossEvent, "removePlayer", player);
+            invokeBestOneArg(bar.bossEvent, "addPlayer", player);
+        }
+        invokeOneArg(bar.bossEvent, "setVisible", boolean.class, true);
+        bar.lastClientReattachGameTime = gameTime;
     }
 
     private static void cleanupInactive(Set<String> activeKeys, long gameTime) {
@@ -637,8 +677,13 @@ public final class RaidIndependentBossbarManager {
                 return;
             }
             boolean hidden = invokeOneArg(bossEvent, "setVisible", boolean.class, false);
-            if (!hidden) {
-                invokeNoArg(bossEvent, "removeAllPlayers");
+            // 0.9.0.4: do not leave clients bound to the original Raid BossBar.
+            // setVisible(false) sends a remove packet, but the vanilla ServerBossEvent
+            // may keep its player set internally and can visually fight the mod-owned
+            // bar when the next wave starts. Removing players is a display-only cleanup.
+            boolean removed = invokeNoArg(bossEvent, "removeAllPlayers");
+            if (!hidden && !removed) {
+                invokeOneArg(bossEvent, "setVisible", boolean.class, false);
             }
         } catch (Throwable throwable) {
             if (!warnedVanillaHideFailure) {
@@ -955,6 +1000,7 @@ public final class RaidIndependentBossbarManager {
         boolean waveEverSawRaiders;
         long lastNearbyScanGameTime;
         int lastNearbyScanCount = -1;
+        long lastClientReattachGameTime;
         int diagPreviousLastWave = -1;
         boolean diagWaveChange;
         boolean diagBaselineReset;
