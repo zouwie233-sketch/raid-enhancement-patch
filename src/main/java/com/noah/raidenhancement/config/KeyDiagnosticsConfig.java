@@ -21,7 +21,7 @@ public final class KeyDiagnosticsConfig {
     private KeyDiagnosticsConfig() {
     }
 
-    public static final String CONFIG_STAGE = "0.9.0.6-bossbar-end-cleanup-and-refill-polish-alpha";
+    public static final String CONFIG_STAGE = "0.9.0.7-bossbar-dimension-safe-cleanup-alpha";
 
     public static boolean ENABLED = false;
     public static boolean LOG_RAID_DISCOVERY = true;
@@ -134,7 +134,7 @@ public final class KeyDiagnosticsConfig {
                 "# Avoid one very long settlement line when many players are eligible.",
                 "log.maxPlayerKeysPerLine=3",
                 "",
-                "# 0.9.0.6 BossBar end-cleanup and refill-polish. Diagnostic-only; does not change raid settlement, rewards, waves or persistent data.",
+                "# 0.9.0.7 BossBar dimension-safe cleanup. Diagnostic-only; does not change raid settlement, rewards, waves or persistent data.",
                 "bossbar.visibleAuthorityAudit.enabled=true",
                 "",
                 "# Authority audit interval for repeated non-critical BossBar visibility/object lines.",

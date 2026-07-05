@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 0.9.0.6: independent raid bossbar end-cleanup and refill polish presenter.
+ * 0.9.0.7: dimension-safe independent raid bossbar cleanup presenter.
  *
  * The previous UI path fought vanilla Raid's own ServerBossEvent#setName calls.
  * That reduced but could not eliminate title flicker. This manager creates one
@@ -63,7 +63,7 @@ public final class RaidIndependentBossbarManager {
             long gameTime = gameTime(serverLevel);
             if (!announced) {
                 announced = true;
-                System.out.println("[Raid Enhancement Patch] 0.9.0.6 BossBar end-cleanup and refill-polish stage is active. The mod-owned BossBar keeps the temporary [REP] marker, suppresses vanilla BossBar during the completion cleanup window, and writes BossBarCleanupAudit diagnostics. This stage does not change settlement keys, rewards, raid waves or progress math.");
+                System.out.println("[Raid Enhancement Patch] 0.9.0.7 BossBar dimension-safe cleanup stage is active. The mod-owned BossBar keeps the temporary [REP] marker, suppresses vanilla BossBar during the completion cleanup window, and writes BossBarCleanupAudit diagnostics. This stage does not change settlement keys, rewards, raid waves or progress math.");
             }
             List<RaidEncounterSnapshot> snapshots = RaidEncounterAuthority.snapshots();
             Set<String> activeKeys = new HashSet<>();
@@ -713,7 +713,7 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(snapshot == null ? null : snapshot.key());
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.0.6-bossbar-end-cleanup-and-refill-polish-alpha"
+                + " version=0.9.0.7-bossbar-dimension-safe-cleanup-alpha"
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(snapshot == null ? null : snapshot.key())
@@ -752,7 +752,7 @@ public final class RaidIndependentBossbarManager {
         }
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.0.6-bossbar-end-cleanup-and-refill-polish-alpha"
+                + " version=0.9.0.7-bossbar-dimension-safe-cleanup-alpha"
                 + " playerKey=" + safeText(id)
                 + " player=" + safeText(playerDisplay(player))
                 + " success=" + success
@@ -977,6 +977,17 @@ public final class RaidIndependentBossbarManager {
         }
     }
 
+    private static boolean sameDimensionForCleanup(Object serverLevel, RaidEncounterSnapshot snapshot) {
+        if (serverLevel == null || snapshot == null) {
+            return true;
+        }
+        String dimensionId = snapshot.dimensionId();
+        if (dimensionId == null || dimensionId.isBlank()) {
+            return true;
+        }
+        return sameDimension(serverLevel, dimensionId);
+    }
+
     private static void cleanupInactive(Set<String> activeKeys, Object serverLevel, long gameTime) {
         List<String> remove = new ArrayList<>();
         for (Map.Entry<String, ManagedBossbar> entry : BARS.entrySet()) {
@@ -990,6 +1001,13 @@ public final class RaidIndependentBossbarManager {
                 continue;
             }
             RaidEncounterSnapshot snapshot = bar.lastSnapshot;
+            if (!sameDimensionForCleanup(serverLevel, snapshot)) {
+                logCleanup("skipped-different-dimension", serverLevel, key, snapshot, bar, gameTime, false,
+                        "cleanupInactive skipped; bossbarDimension=" + safeText(snapshot == null ? null : snapshot.dimensionId())
+                                + "; levelDimension=" + safeText(dimensionIdForAudit(serverLevel))
+                                + "; no inactive cleanup and no vanilla suppress outside owning dimension");
+                continue;
+            }
             if (bar.inactiveSinceGameTime <= 0L) {
                 bar.inactiveSinceGameTime = gameTime;
                 bar.cleanupSuppressUntilGameTime = gameTime + COMPLETED_VANILLA_SUPPRESS_TICKS;
@@ -1029,6 +1047,13 @@ public final class RaidIndependentBossbarManager {
 
     private static void suppressVanillaForCleanup(Object serverLevel, String key, RaidEncounterSnapshot snapshot,
                                                   ManagedBossbar bar, long gameTime, String note) {
+        if (!sameDimensionForCleanup(serverLevel, snapshot)) {
+            logCleanup("skipped-different-dimension", serverLevel, key, snapshot, bar, gameTime, false,
+                    "suppressVanillaForCleanup skipped; bossbarDimension=" + safeText(snapshot == null ? null : snapshot.dimensionId())
+                            + "; levelDimension=" + safeText(dimensionIdForAudit(serverLevel))
+                            + "; note=" + safeText(note));
+            return;
+        }
         Object bossEvent = vanillaBossEvent(key);
         int beforePlayers = bossEventPlayerCount(bossEvent);
         float beforeProgress = readBossEventProgressOrNaN(bossEvent);
@@ -1074,7 +1099,7 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(key);
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarCleanupAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.0.6-bossbar-end-cleanup-and-refill-polish-alpha"
+                + " version=0.9.0.7-bossbar-dimension-safe-cleanup-alpha"
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(key)
