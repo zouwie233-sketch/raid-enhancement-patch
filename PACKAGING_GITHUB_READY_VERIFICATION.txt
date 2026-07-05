@@ -1,0 +1,7 @@
+0.9.0.2 GitHub-ready packaging verification
+settings.gradle: exists=True size=460 first8=706c7567696e4d61 has_bom=False
+build.gradle: exists=True size=904 first8=706c7567696e7320 has_bom=False
+gradle.properties: exists=True size=225 first8=6d6f645f69643d72 has_bom=False
+src/main/resources/META-INF/neoforge.mods.toml: exists=True size=1256 first8=6d6f644c6f616465 has_bom=False
+.github/workflows/build-mod.yml: exists=True size=2791 first8=6e616d653a204275 has_bom=False
+.gitignore: exists=True size=92 first8=2e677261646c652f has_bom=False

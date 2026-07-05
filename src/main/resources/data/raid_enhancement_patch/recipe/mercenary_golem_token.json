@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "III",
+    "ISI",
+    "IPI"
+  ],
+  "key": {
+    "I": {
+      "item": "minecraft:iron_block"
+    },
+    "S": {
+      "item": "raid_enhancement_patch:advanced_shield_token"
+    },
+    "P": {
+      "item": "minecraft:carved_pumpkin"
+    }
+  },
+  "result": {
+    "id": "raid_enhancement_patch:mercenary_golem_token",
+    "count": 1
+  }
+}

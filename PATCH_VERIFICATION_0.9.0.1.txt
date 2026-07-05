@@ -1,0 +1,11 @@
+Patch verification summary:
+- Version metadata updated to 0.9.0.1-key-link-diagnostics-alpha in gradle.properties, RaidEnhancementPatch.java and neoforge.mods.toml.
+- New config class: com.noah.raidenhancement.config.KeyDiagnosticsConfig.
+- New diagnostics class: com.noah.raidenhancement.raid.RaidKeyDiagnostics.
+- Modified call sites: RaidEnhancementPatch, RaidExtraWaveController, VictorySettlementController, RaidIndependentBossbarManager, VillageFavorSystem, VillageFavorState.
+- No Mixin configuration changes.
+- No raid wave table changes.
+- No BossBar progress algorithm changes.
+- No settlement reward value changes.
+- No villager gift logic changes.
+- No external Gradle build performed in this sandbox.

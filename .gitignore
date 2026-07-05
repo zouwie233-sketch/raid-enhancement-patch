@@ -1,0 +1,16 @@
+﻿.gradle/
+build/
+out/
+run/
+logs/
+*.log
+
+.idea/
+*.iml
+
+.DS_Store
+Thumbs.db
+
+saves/
+crash-reports/
+screenshots/

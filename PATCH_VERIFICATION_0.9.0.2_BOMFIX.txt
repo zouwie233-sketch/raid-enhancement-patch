@@ -1,0 +1,8 @@
+0.9.0.2 packaging BOM verification
+
+settings.gradle: starts_with_utf8_bom=False
+build.gradle: starts_with_utf8_bom=False
+gradle.properties: starts_with_utf8_bom=False
+src/main/resources/META-INF/neoforge.mods.toml: starts_with_utf8_bom=False
+
+No gameplay logic changed in this repackaging hotfix.

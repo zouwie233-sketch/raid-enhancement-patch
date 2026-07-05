@@ -1,0 +1,21 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.noah.raidenhancement.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "RaidWaveIndexClampMixin",
+    "RaidsEnhancedFinalWaveGuardMixin",
+    "RaidVictorySuppressMixin",
+    "RaidsEnhancedGolemCanEntityGriefGateMixin",
+    "RaidsEnhancedGolemOfLastResortBlockBreakMixin",
+    "RaidsEnhancedGolemHurtTimerGuardMixin",
+    "RaidsEnhancedGolemEntityDestroyBlockEventHookMixin",
+    "RaidsEnhancedGolemLevelDestroyBlockHardGuardMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

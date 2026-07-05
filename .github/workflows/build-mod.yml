@@ -1,0 +1,92 @@
+name: Build Minecraft Mod JAR
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Remove UTF-8 BOM from Gradle/resource files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              Path('settings.gradle'),
+              Path('build.gradle'),
+              Path('gradle.properties'),
+              Path('src/main/resources/META-INF/neoforge.mods.toml'),
+              Path('src/main/resources/raid_enhancement_patch.mixins.json'),
+          ]
+
+          for path in files:
+              if not path.exists():
+                  print(f'[BOM-CHECK] missing: {path}')
+                  continue
+              data = path.read_bytes()
+              if data.startswith(b'\xef\xbb\xbf'):
+                  path.write_bytes(data[3:])
+                  print(f'[BOM-CHECK] removed UTF-8 BOM: {path}')
+              else:
+                  print(f'[BOM-CHECK] ok no BOM: {path} firstBytes={data[:8].hex()}')
+          PY
+
+      - name: Hard verify Gradle entry files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          checks = {
+              Path('settings.gradle'): b'pluginManagement',
+              Path('build.gradle'): b'plugins',
+              Path('gradle.properties'): b'mod_id',
+          }
+
+          for path, prefix in checks.items():
+              data = path.read_bytes()
+              print(f'{path} first 32 bytes:', data[:32].hex())
+              print(f'{path} first line repr:', repr(data.splitlines()[0] if data.splitlines() else b''))
+              if data.startswith(b'\xef\xbb\xbf'):
+                  raise SystemExit(f'ERROR: {path} still has UTF-8 BOM')
+              if not data.startswith(prefix):
+                  raise SystemExit(f'ERROR: {path} does not start with expected prefix {prefix!r}')
+          print('Gradle entry file byte check passed')
+          PY
+
+      - name: Grant execute permission for Gradle Wrapper
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle Wrapper
+        run: ./gradlew clean build --stacktrace --no-daemon
+
+      - name: List build outputs
+        if: always()
+        run: |
+          echo 'Repository root:'
+          pwd
+          echo 'build/libs:'
+          ls -lah build/libs || true
+
+      - name: Upload built JAR
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raid-enhancement-built-jar
+          path: build/libs/*.jar
+          retention-days: 7

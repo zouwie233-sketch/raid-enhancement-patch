@@ -1,0 +1,13 @@
+Patch verification summary:
+- Version metadata updated to 0.9.0.2-key-bossbar-diagnostics-logfile-alpha in gradle.properties, RaidEnhancementPatch.java and neoforge.mods.toml.
+- RaidKeyDiagnostics now uses SLF4J logger output and writes config/raid_enhancement_patch/key_diagnostics.log.
+- Startup diagnostic marker added through RaidKeyDiagnostics.logStartup(VERSION).
+- BossBar diagnostics now report wave, previousLastWave, waveChange, baselineReset, alive, baseline, progress, countSource, nativeCount, sessionCount, nearbyCount, refillAttempt, progressApplied, vanillaProgress, decision, snapshotAgeTicks and staleSnapshotCandidate.
+- No Mixin configuration changes.
+- No raid wave table changes.
+- No BossBar progress algorithm fix or intentional behavior change.
+- No settlement reward value changes.
+- No villager gift logic changes.
+- No persistence migration.
+- No external Gradle build performed in this sandbox.
+- Stub-based Java syntax check for modified diagnostics classes passed.

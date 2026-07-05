@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 2,
+  "stage": "0.8.9.6-village-security-deployment-doctrine",
+  "modules": {
+    "raidSession": true,
+    "villagerProtection": true,
+    "autoRaidVillagerProtection": true,
+    "compatibilityNote": "0.8.8.1 keeps the confirmed Step 3-8.8 behavior and adds only a low-count glowing locator return hotfix. When all players are away from the battlefield, the residual-raider glowing locator does not run and cannot consume its per-wave one-shot lock.",
+    "waveExpansion": true,
+    "multiSpawnPoints": true,
+    "secondaryReinforcementSizePerPoint": 6,
+    "raidsEnhancedSpecials": true,
+    "waveClearTimer": false,
+    "attackPreview": false,
+    "raiderHighlight": true,
+    "knownRaiderCache": true,
+    "raiderTimeWeight": true,
+    "waveTimeBudget": true,
+    "waveTimeDisplay": true,
+    "timeoutRaiderAudit": true,
+    "villageSecurity": true
+  },
+  "villagerProtection": {
+    "enabled": true,
+    "debugCommandsEnabled": false,
+    "refreshIntervalTicks": 100,
+    "sweepIntervalTicks": 200,
+    "effectDurationTicks": 300,
+    "resistanceAmplifier": 4,
+    "regenerationAmplifier": 2,
+    "absorptionAmplifier": 19,
+    "cancelAllDamageWhileProtected": true,
+    "effectsEnabled": true,
+    "removeEffectsOnRelease": true
+  },
+
+  "villageSecurity": {
+    "enabled": true,
+    "tickIntervalTicks": 20,
+    "messagesEnabled": true,
+    "performanceOptimizationEnabled": true,
+    "villagerCacheRefreshIntervalTicks": 100,
+    "golemGlowRefreshIntervalTicks": 80,
+    "raiderCacheScanIntervalTicks": 20,
+    "stragglerGlowIntervalTicks": 40,
+    "raiderAuditIntervalTicks": 200,
+    "specialRaiderScanIntervalTicks": 100,
+    "timeoutPenaltyCheckIntervalTicks": 20,
+    "activeSessionFastCheck": true,
+    "cleanupEndedSessionsAggressively": true,
+    "radius": 96,
+    "securityGolems": {
+      "villagersPerGolem": {
+        "easy": 5,
+        "normal": 8,
+        "hard": 10
+      },
+      "minPerWave": 1,
+      "maxPerWave": 5,
+      "glowDurationTicks": 160,
+      "spawnRingRadius": 12
+    },
+    "breachDamage": 4.0,
+    "victoryOrdinaryGolems": {
+      "easy": 1,
+      "normal": 2,
+      "hard": 3
+    },
+    "strictRules0889": {
+      "villagerHealthClampEnabled": true,
+      "healthClampDurationTicks": 24000,
+      "trimOrdinaryGolemsOnRaidStart": true,
+      "keepOrdinaryUnnamedGolems": {
+        "easy": 3,
+        "normal": 2,
+        "hard": 1
+      }
+    },
+    "notes": [
+      "0.8.9.5.1 keeps the tested village-golem player-protection baseline and adds configurable performance audit/cache throttles without changing raid outcomes.",
+      "Security messages use the Village Defense League / 村民防卫同盟 narrative and trigger only at initial deployment, wave reinforcement/repair, per-wave defense failure, victory, and non-victory ending.",
+      "Protected villagers keep external damage protection, but outside healing is clamped back to the recorded allowed health during the raid.",
+      "The internal 4-point security breach damage updates allowed health, so it is not erased by protection or anti-heal logic.",
+      "Only ordinary unnamed iron golems near the raid center are trimmed at raid start. Named golems and managed security golems are preserved.",
+      "Villager range scans are cached per raid and refreshed by villagerCacheRefreshIntervalTicks. Security golem glowing, known-raider cache scans, straggler locator checks, timeout audits and timeout-penalty checks are throttled by the performanceOptimization settings.",
+      "Runtime config file: config/raid_enhancement_patch/village_security.properties. Restart the game/server after editing."
+    ]
+  },
+  "waveExpansion": {
+    "enabled": true,
+    "refreshIntervalTicks": 40,
+    "positionSampleRadius": 64,
+    "maxRaidsPerSweep": 16,
+    "easy": {
+      "omen1": 3,
+      "omen2": 3,
+      "omen3": 4,
+      "omen4": 4,
+      "omen5": 5
+    },
+    "normal": {
+      "omen1": 5,
+      "omen2": 6,
+      "omen3": 6,
+      "omen4": 7,
+      "omen5": 8
+    },
+    "hard": {
+      "omen1": 8,
+      "omen2": 8,
+      "omen3": 9,
+      "omen4": 10,
+      "omen5": 11
+    },
+    "notes": [
+      "This template is documentation only in 0.8.1; values are currently static Java defaults.",
+      "This stage caps native Raid.numGroups to the stable vanilla-safe range; waves beyond the native-safe layer are spawned by the custom extra-wave controller, and only those custom waves use multi-spawn reinforcement points."
+    ]
+  },
+  "waveTimeDisplay": {
+    "enabled": true,
+    "actionbarEnabled": false,
+    "waveStartChatEnabled": true,
+    "warningChatEnabled": true,
+    "actionbarIntervalTicks": 20,
+    "waveStartDelayTicks": 180,
+    "radius": 128,
+    "warningThresholdsSeconds": [60, 30, 10],
+    "notes": [
+      "This stage is display-only. It does not trigger failure, teleport, clearing, damage, or vanilla Raid state mutation.",
+      "The existing top-center raid wave HUD shows current wave, remaining time, and total budget. The actionbar path is retained but disabled by default. Chat gives one locked budget breakdown per wave and threshold warnings at 60/30/10 seconds."
+    ]
+  },
+
+  "timeoutRaiderAudit": {
+    "enabled": true,
+    "auditIntervalTicks": 200,
+    "messageIntervalTicks": 600,
+    "glowIntervalTicks": 200,
+    "normalRadius": 128,
+    "farRadius": 192,
+    "missingGraceTicks": 400,
+    "stuckStillTicks": 600,
+    "stuckMovementThresholdBlocks": 2,
+    "notes": [
+      "This stage only audits and reports timeout leftovers. It does not teleport, clear, fail, damage, or mutate vanilla Raid state.",
+      "Known UUID lookup is checked first; located raiders can be re-marked with glowing at low frequency. Special raiders keep the long Step 7 glow priority."
+    ]
+  },
+  "knownRaiderCache": {
+    "enabled": true,
+    "scanIntervalTicks": 20,
+    "scanRadius": 128,
+    "staleRecordTtlTicks": 2400,
+    "inactiveSessionTtlTicks": 12000,
+    "notes": [
+      "This is a runtime-only cache. It does not write SavedData yet.",
+      "The cache is a prerequisite for future stuck-raider detection and timeout mechanics.",
+      "The cache now also stores each raider timeWeightSeconds and raidCaptainWhenLastSeen for the dynamic wave budget."
+    ]
+  },
+  "autoRaidVillagerProtection": {
+    "enabled": true,
+    "scanIntervalTicks": 100,
+    "releaseIntervalTicks": 100,
+    "scanRadiusAroundPlayers": 96,
+    "maxVillagersScannedPerSweep": 256,
+    "protectionDurationTicks": 400,
+    "raiderFallbackRadius": 96,
+    "notes": [
+      "This template is documentation only in 0.8.1; values are currently static Java defaults.",
+      "The automatic protector scans near loaded players every 5 seconds, checks villagers against vanilla raid-area methods through reflection, and releases auto-protected villagers when the raid area is no longer active.",
+      "Debug commands remain disabled to keep compatibility with large modpacks."
+    ]
+  },
+  "raiderTimeWeight": {
+    "enabled": true,
+    "weightsSeconds": {
+      "minecraft:pillager": 8,
+      "minecraft:vindicator": 10,
+      "minecraft:witch": 18,
+      "minecraft:evoker": 28,
+      "minecraft:ravager": 45,
+      "raidCaptainBonus": 8,
+      "raidsenhanced:zapper": 35,
+      "raidsenhanced:golem_of_last_resort": 75,
+      "raidsenhanced:raid_blimp": 90,
+      "raidsenhanced:raid_drill": 110,
+      "unknownRaidsEnhancedSpecial": 60,
+      "unknownRaider": 10
+    },
+    "notes": [
+      "The raid drill has the highest weight because its multi-hit removal mechanic cannot be bypassed by high damage.",
+      "Weights model expected clear time, not only health."
+    ]
+  },
+  "activeCombatClock": {
+    "enabled": true,
+    "radius": 160,
+    "absenceGraceTicks": 600,
+    "noPlayerCacheScanIntervalTicks": 200,
+    "notes": [
+      "Only players in the same dimension, alive, non-spectator, and within the configured radius count as active combat participants.",
+      "After all players leave for the grace window, the modded clear timer pauses and timeout raider audit/glowing loops stop. Vanilla Raid itself is not paused or mutated.",
+      "When a player returns to the battlefield, the modded clear timer resumes from its previous remaining time."
+    ]
+  },
+  "waveTimeBudget": {
+    "enabled": true,
+    "recalculateIntervalTicks": 20,
+    "timeoutEvaluationGraceTicks": 1200,
+    "budgetCollectionTicks": 160,
+    "timeoutChatWarning": true,
+    "enforceFailure": false,
+    "baseSeconds": {
+      "wave1To3": 120,
+      "wave4To6": 150,
+      "wave7To8": 180,
+      "wave9": 210,
+      "wave10": 240,
+      "wave11Plus": 270
+    },
+    "additiveSeconds": {
+      "sideAttackPointEach": 20,
+      "wave9Extra": 60,
+      "wave10Extra": 90,
+      "wave11PlusExtra": 120
+    },
+    "maxSeconds": {
+      "wave1To3": 300,
+      "wave4To6": 420,
+      "wave7To8": 600,
+      "wave9": 720,
+      "wave10": 840,
+      "wave11Plus": 960
+    },
+    "postLockExtraCapsSeconds": {
+      "wave1To3": 60,
+      "wave4To6": 90,
+      "wave7To8": 120,
+      "wave9": 150,
+      "wave10": 180,
+      "wave11Plus": 210
+    },
+    "notes": [
+      "Each wave now has an initial collection window. Late cache discoveries during this window help set the initial locked budget instead of creating visible mid-wave inflation.",
+      "After the budget is locked, ordinary VANILLA_MAIN_POINT raiders discovered by scans are tracked but do not add time. Trusted post-lock sources, such as side-point reinforcements and Raids Enhanced special raiders, may add time up to the per-wave cap.",
+      "0.8.9.3 preserves the stable timeout/UI behavior and adds non-destructive timeout penalties through villager life pressure. It still does not trigger vanilla failure, teleport, clear raiders, or mutate vanilla Raid state."
+    ]
+  }
+}

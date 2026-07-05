@@ -1,0 +1,35 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.107'
+}
+
+version = project.mod_version
+group = project.mod_group_id
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(project.java_version as int)
+
+neoForge {
+    version = project.neoforge_version
+    mods {
+        raid_enhancement_patch {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+base {
+    archivesName = project.mod_id
+}
+
+jar {
+    manifest {
+        attributes([
+                'Specification-Title'     : project.mod_id,
+                'Specification-Vendor'    : 'Noah Black / ChatGPT generated patch project',
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.mod_name,
+                'Implementation-Version'  : project.mod_version,
+                'Implementation-Vendor'   : 'Noah Black / ChatGPT generated patch project'
+        ])
+    }
+}

@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "EEE",
+    "EXE",
+    "EEE"
+  ],
+  "key": {
+    "E": {
+      "item": "minecraft:emerald"
+    },
+    "X": {
+      "item": "minecraft:amethyst_block"
+    }
+  },
+  "result": {
+    "id": "raid_enhancement_patch:advanced_strength_token",
+    "count": 1
+  }
+}

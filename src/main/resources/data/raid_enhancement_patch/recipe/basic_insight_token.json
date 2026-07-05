@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "EEE",
+    "EXE",
+    "EEE"
+  ],
+  "key": {
+    "E": {
+      "item": "minecraft:emerald"
+    },
+    "X": {
+      "item": "minecraft:spider_eye"
+    }
+  },
+  "result": {
+    "id": "raid_enhancement_patch:basic_insight_token",
+    "count": 1
+  }
+}
