@@ -1,7 +1,13 @@
 name: Build Minecraft Mod JAR
+run-name: "Build Mod JAR | ${{ github.event.head_commit.message || github.event.inputs.mod_version || github.ref_name }}"
 
 on:
   workflow_dispatch:
+    inputs:
+      mod_version:
+        description: "Mod version, e.g. 0.9.0.5"
+        required: false
+        type: string
   push:
     branches:
       - main
@@ -20,53 +26,79 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: gradle
 
-      - name: Remove UTF-8 BOM from Gradle/resource files
+      - name: Remove UTF-8 BOM from Gradle files
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           files = [
-              Path('settings.gradle'),
-              Path('build.gradle'),
-              Path('gradle.properties'),
-              Path('src/main/resources/META-INF/neoforge.mods.toml'),
-              Path('src/main/resources/raid_enhancement_patch.mixins.json'),
+              Path("settings.gradle"),
+              Path("build.gradle"),
+              Path("gradle.properties"),
+              Path("src/main/resources/META-INF/neoforge.mods.toml"),
+              Path("src/main/resources/raid_enhancement_patch.mixins.json"),
           ]
-
           for path in files:
               if not path.exists():
-                  print(f'[BOM-CHECK] missing: {path}')
+                  print(f"[BOM-CHECK] missing: {path}")
                   continue
               data = path.read_bytes()
-              if data.startswith(b'\xef\xbb\xbf'):
+              if data.startswith(b"\xef\xbb\xbf"):
                   path.write_bytes(data[3:])
-                  print(f'[BOM-CHECK] removed UTF-8 BOM: {path}')
+                  print(f"[BOM-CHECK] removed UTF-8 BOM: {path}")
               else:
-                  print(f'[BOM-CHECK] ok no BOM: {path} firstBytes={data[:8].hex()}')
+                  print(f"[BOM-CHECK] ok no BOM: {path} firstBytes={data[:8].hex()}")
           PY
 
       - name: Hard verify Gradle entry files
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          for name, expected in [
+              ("settings.gradle", b"pluginManagement"),
+              ("build.gradle", None),
+              ("gradle.properties", None),
+          ]:
+              p = Path(name)
+              if not p.exists():
+                  raise SystemExit(f"ERROR: missing {name}")
+              data = p.read_bytes()
+              print(f"{name} first 32 bytes:", data[:32].hex())
+              print(f"{name} first line repr:", repr(data.splitlines()[0] if data.splitlines() else b""))
+              if data.startswith(b"\xef\xbb\xbf"):
+                  raise SystemExit(f"ERROR: {name} still has UTF-8 BOM")
+              if expected and not data.startswith(expected):
+                  raise SystemExit(f"ERROR: {name} does not start with {expected!r}")
+          print("Gradle entry file check passed")
+          PY
 
-          checks = {
-              Path('settings.gradle'): b'pluginManagement',
-              Path('build.gradle'): b'plugins',
-              Path('gradle.properties'): b'mod_id',
-          }
-
-          for path, prefix in checks.items():
-              data = path.read_bytes()
-              print(f'{path} first 32 bytes:', data[:32].hex())
-              print(f'{path} first line repr:', repr(data.splitlines()[0] if data.splitlines() else b''))
-              if data.startswith(b'\xef\xbb\xbf'):
-                  raise SystemExit(f'ERROR: {path} still has UTF-8 BOM')
-              if not data.startswith(prefix):
-                  raise SystemExit(f'ERROR: {path} does not start with expected prefix {prefix!r}')
-          print('Gradle entry file byte check passed')
+      - name: Read mod version
+        id: modver
+        env:
+          DISPATCH_VERSION: ${{ github.event.inputs.mod_version || '' }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          version = ""
+          p = Path("gradle.properties")
+          if p.exists():
+              for line in p.read_text(encoding="utf-8", errors="replace").splitlines():
+                  m = re.match(r"\s*(mod_version|version|project_version)\s*=\s*(.+?)\s*$", line)
+                  if m:
+                      version = m.group(2).strip().strip('"').strip("'")
+                      break
+          if not version:
+              version = os.environ.get("DISPATCH_VERSION", "").strip()
+          if not version:
+              version = "unknown"
+          m = re.match(r"^([0-9]+(?:\.[0-9]+){2,3})", version)
+          if m:
+              version = m.group(1)
+          safe = re.sub(r"[^A-Za-z0-9._-]+", "-", version).strip("-") or "unknown"
+          print(f"Detected mod version: {safe}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write(f"version={safe}\n")
           PY
 
       - name: Grant execute permission for Gradle Wrapper
@@ -76,17 +108,11 @@ jobs:
         run: ./gradlew clean build --stacktrace --no-daemon
 
       - name: List build outputs
-        if: always()
-        run: |
-          echo 'Repository root:'
-          pwd
-          echo 'build/libs:'
-          ls -lah build/libs || true
+        run: ls -lah build/libs
 
       - name: Upload built JAR
-        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: raid-enhancement-built-jar
+          name: raid-enhancement-built-jar-v${{ steps.modver.outputs.version }}
           path: build/libs/*.jar
           retention-days: 7
