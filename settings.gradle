@@ -1,4 +1,4 @@
-﻿pluginManagement {
+pluginManagement {
     repositories {
         mavenLocal()
         gradlePluginPortal()
@@ -8,7 +8,7 @@
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         mavenLocal()
         maven { url = 'https://maven.neoforged.net/releases' }
@@ -17,4 +17,3 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = 'raid_enhancement_patch'
-

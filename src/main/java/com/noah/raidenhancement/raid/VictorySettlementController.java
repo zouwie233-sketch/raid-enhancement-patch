@@ -108,18 +108,23 @@ public final class VictorySettlementController {
         }
         try {
             ensureLoaded();
-            String settlementKey = settlementKey(dimensionId, raidKey);
+            RaidSession session = RaidSessionManager.get(raidKey).orElse(null);
+            String legacySettlementKey = settlementKey(dimensionId, raidKey);
+            String settlementKey = raidInstanceSettlementKey(dimensionId, raidKey, session, gameTime);
             RaidKeyDiagnostics.logSettlement("before-history-check", level, raidKey, dimensionId, centerX, centerY, centerZ,
                     settlementKey, gameTime, omenLevel, Math.max(preparedWaves, totalWaves), null);
+            if (SETTLED_RAIDS.contains(legacySettlementKey) && !legacySettlementKey.equals(settlementKey)) {
+                RaidKeyDiagnostics.logSettlement("legacy-history-present-ignored", level, raidKey, dimensionId, centerX, centerY, centerZ,
+                        legacySettlementKey, gameTime, omenLevel, Math.max(preparedWaves, totalWaves), null);
+            }
             if (SETTLED_RAIDS.contains(settlementKey)) {
-                RaidKeyDiagnostics.logSettlement("duplicate-blocked-by-history", level, raidKey, dimensionId, centerX, centerY, centerZ,
+                RaidKeyDiagnostics.logSettlement("duplicate-blocked-by-raid-instance-history", level, raidKey, dimensionId, centerX, centerY, centerZ,
                         settlementKey, gameTime, omenLevel, Math.max(preparedWaves, totalWaves), null);
                 return;
             }
             SETTLED_RAIDS.add(settlementKey);
             saveSettlementHistory();
 
-            RaidSession session = RaidSessionManager.get(raidKey).orElse(null);
             VictoryTier tier = VictoryTier.grade(defenseFailures, timeoutPenalties, damagedVillagerEvents, timeoutDamagedVillagerEvents);
             Collection<UUID> storedParticipants = session == null ? List.of() : session.settlementParticipants();
             List<Player> eligiblePlayers = eligiblePlayers(level, centerX, centerY, centerZ, storedParticipants);
@@ -567,6 +572,20 @@ public final class VictorySettlementController {
 
     private static String settlementKey(String dimensionId, String raidKey) {
         return sanitize(dimensionId == null ? "unknown" : dimensionId) + "@" + sanitize(raidKey == null ? "unknown" : raidKey);
+    }
+
+    private static String raidInstanceSettlementKey(String dimensionId, String raidKey, RaidSession session, long gameTime) {
+        String dimension = sanitize(dimensionId == null ? "unknown" : dimensionId);
+        String baseRaidKey = sanitize(raidKey == null ? "unknown" : raidKey);
+        if (session != null) {
+            return dimension + "@raidInstance:" + baseRaidKey
+                    + "#sessionRaidId=" + session.raidId()
+                    + "#created=" + session.createdGameTime();
+        }
+        // Fallback is intentionally marked as such. Normal 0.9.0.3 settlement should have
+        // a RaidSession so duplicate prevention is stable for the same raid instance while
+        // allowing later raids in the same village to settle again.
+        return dimension + "@raidInstance:fallback:" + baseRaidKey + "#completed=" + gameTime;
     }
 
     private static String favorKey(String dimensionId, int centerX, int centerY, int centerZ, UUID playerUuid) {

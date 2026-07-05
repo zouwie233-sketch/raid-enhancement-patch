@@ -2,7 +2,7 @@
 
 ## Version
 
-0.9.0.2-key-bossbar-diagnostics-logfile-alpha
+0.9.0.3-settlement-raidinstance-key-alpha
 
 ## Base
 
@@ -31,7 +31,7 @@ A lightweight stub-based Java syntax check was run for the modified diagnostics 
 ## Expected output after external build
 
 ```text
-build/libs/raid_enhancement_patch-0.9.0.2-key-bossbar-diagnostics-logfile-alpha.jar
+build/libs/raid_enhancement_patch-0.9.0.3-settlement-raidinstance-key-alpha.jar
 ```
 
 ## Important note

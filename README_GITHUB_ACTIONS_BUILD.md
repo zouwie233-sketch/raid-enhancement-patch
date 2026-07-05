@@ -1,6 +1,6 @@
 # GitHub Actions 构建说明
 
-本包是 0.9.0.2-key-bossbar-diagnostics-logfile-alpha 的 GitHub 重新建库可用源码包。
+本包是 0.9.0.3-settlement-raidinstance-key-alpha 的 GitHub 重新建库可用源码包。
 
 ## 使用方法
 
@@ -22,5 +22,5 @@
 
 - 当前 workflow 不使用 gradle/actions/setup-gradle，避免 Wrapper JAR 校验拦截。
 - workflow 会在 Gradle 启动前清理 settings.gradle / build.gradle / gradle.properties 等文件的 UTF-8 BOM。
-- 0.9.0.2 只是诊断版，不是稳定修复版。
-- 本版不修 BossBar 回充，只增强 KeyDiag / BossBarDiag 输出。
+- 0.9.0.3 是 settlementKey 热修候选版，不是稳定版。
+- 本版不修 BossBar 回充，只修 VictorySettlement 防重复结算 key，并保留 KeyDiag / BossBarDiag 输出。

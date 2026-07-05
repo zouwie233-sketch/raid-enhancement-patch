@@ -1,0 +1,16 @@
+Patch verification for 0.9.0.3-settlement-raidinstance-key-alpha
+
+Scope:
+- Only VictorySettlement duplicate guard key changed from legacy village/raid-center key to RaidInstanceKey.
+- VillageFavor record path unchanged.
+- BossBar algorithm unchanged.
+- Mixin config unchanged.
+- Raid waves/rewards/gifts unchanged.
+
+Build status in this ChatGPT runtime:
+- Gradle build not executed here.
+- Expected GitHub Actions/local output: build/libs/raid_enhancement_patch-0.9.0.3-settlement-raidinstance-key-alpha.jar
+
+Manual preflight:
+- Version strings updated in gradle.properties, RaidEnhancementPatch.java, neoforge.mods.toml.
+- settings.gradle/build.gradle/gradle.properties checked for UTF-8 BOM in final package.

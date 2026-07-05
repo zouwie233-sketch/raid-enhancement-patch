@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.0.2-key-bossbar-diagnostics-logfile-alpha"
+version="0.9.0.3-settlement-raidinstance-key-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.0.2 keeps the 0.9.0.0 village favor V2 code and adds opt-in key-chain diagnostics for auditing VillageKey, RaidInstanceKey candidates, settlement keys, favor record keys, raid session keys and BossBar keys. This diagnostic stage does not modify raid waves, BossBar progress, settlement rewards, villager gifts, villager trades or Mixin behavior.
+Stage 0.9.0.3 keeps the 0.9.0.2 diagnostics and changes only the VictorySettlement duplicate-guard key so settlement history uses a RaidInstanceKey instead of the legacy village-center key. VillageFavor still uses the VillageKey path. This stage does not modify raid waves, BossBar progress, rewards, villager gifts, villager trades or Mixin behavior.
 '''
 
 [[mixins]]

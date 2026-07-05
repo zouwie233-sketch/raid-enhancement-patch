@@ -101,7 +101,11 @@ public final class RaidKeyDiagnostics {
             return;
         }
         String villageKey = villageKey(dimensionId, centerX, centerY, centerZ);
-        String raidInstanceCandidate = raidInstanceCandidate(dimensionId, raidKey, raidKey == null ? 0 : raidKey.hashCode(), gameTime, null);
+        String settlement = safe(settlementKey);
+        String raidInstanceCandidate = settlement.contains("@raidInstance:")
+                ? settlement
+                : raidInstanceCandidate(dimensionId, raidKey, raidKey == null ? 0 : raidKey.hashCode(), gameTime, null);
+        String settlementKeyMode = settlement.contains("@raidInstance:") ? "raidInstance" : "legacyVillageCenter";
         String playerKeys = playerFavorKeys(dimensionId, centerX, centerY, centerZ, eligiblePlayers);
         emit("settlement", "phase=" + safe(phase)
                 + " dimensionId=" + safe(dimensionId)
@@ -109,7 +113,8 @@ public final class RaidKeyDiagnostics {
                 + " raidKey=" + safe(raidKey)
                 + " villageKey=" + villageKey
                 + " raidInstanceKeyCandidate=" + raidInstanceCandidate
-                + " settlementKey=" + safe(settlementKey)
+                + " settlementKey=" + settlement
+                + " settlementKeyMode=" + settlementKeyMode
                 + " bossBarKeyCandidate=" + safe(raidKey)
                 + " raidSessionKeyCandidate=" + safe(raidKey)
                 + " omenLevel=" + omenLevel
