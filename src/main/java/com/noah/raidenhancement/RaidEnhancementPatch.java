@@ -26,7 +26,7 @@ import net.neoforged.fml.common.Mod;
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.0.8-bossbar-victory-vanilla-final-suppress-alpha";
+    public static final String VERSION = "0.9.0.9-victory-bar-attach-guard-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -46,7 +46,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Keeps the 0.9.0.3 RaidInstanceKey settlement fix, the [REP] independent BossBar path, same-wave refill suppression and dimension-safe cleanup, then adds a final same-dimension vanilla victory BossBar suppress window; it does not change settlement keys, raid waves, rewards, VillageFavor, villager gifts, baselineReset, waveChange, progress math or Raids Enhanced rollback guard.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Keeps the 0.9.0.3 RaidInstanceKey settlement fix, the [REP] independent BossBar path, same-wave refill suppression and dimension-safe cleanup, then adds a same-dimension VictoryBarAttachGuard for delayed vanilla victory BossBar rebinds; it does not change settlement keys, raid waves, rewards, VillageFavor, villager gifts, baselineReset, waveChange, progress math or Raids Enhanced rollback guard.");
     }
 
     /**

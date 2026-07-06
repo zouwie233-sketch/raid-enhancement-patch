@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 0.9.0.8: final vanilla victory BossBar suppress presenter.
+ * 0.9.0.9: vanilla victory BossBar attach guard presenter.
  *
  * The previous UI path fought vanilla Raid's own ServerBossEvent#setName calls.
  * That reduced but could not eliminate title flicker. This manager creates one
@@ -33,6 +33,7 @@ import java.util.UUID;
  */
 public final class RaidIndependentBossbarManager {
     private static final Map<String, ManagedBossbar> BARS = new LinkedHashMap<>();
+    private static final Map<String, VictoryAttachGuard> VICTORY_ATTACH_GUARDS = new LinkedHashMap<>();
     private static final Map<Class<?>, Map<String, Method>> NO_ARG_METHOD_CACHE = new IdentityHashMap<>();
     private static final Map<Class<?>, Map<String, Method>> ONE_ARG_METHOD_CACHE = new IdentityHashMap<>();
     private static final Set<String> PLAYERS_SNAPSHOT = new HashSet<>();
@@ -51,6 +52,9 @@ public final class RaidIndependentBossbarManager {
     private static final long CLEANUP_AUDIT_INTERVAL_TICKS = 20L;
     private static final long VICTORY_SUPPRESS_MIN_TICKS = 120L;
     private static final long VICTORY_SUPPRESS_STABLE_ZERO_TICKS = 100L;
+    private static final long VICTORY_ATTACH_GUARD_TICKS = 1200L;
+    private static final long VICTORY_ATTACH_GUARD_MIN_TICKS = 200L;
+    private static final long VICTORY_ATTACH_GUARD_STABLE_ZERO_TICKS = 300L;
     private static final long CLIENT_REATTACH_INTERVAL_TICKS = 20L;
     private static final double PLAYER_RADIUS_SQ = 128.0D * 128.0D;
 
@@ -65,7 +69,7 @@ public final class RaidIndependentBossbarManager {
             long gameTime = gameTime(serverLevel);
             if (!announced) {
                 announced = true;
-                System.out.println("[Raid Enhancement Patch] 0.9.0.8 BossBar final vanilla victory suppress stage is active. The mod-owned BossBar keeps the temporary [REP] marker, preserves dimension-safe cleanup, and extends the same-dimension completion window to suppress delayed vanilla victory BossBar rebinds. This stage does not change settlement keys, rewards, raid waves, baselineReset, waveChange or progress math.");
+                System.out.println("[Raid Enhancement Patch] 0.9.0.9 BossBar victory attach guard stage is active. The mod-owned BossBar keeps the temporary [REP] marker, preserves dimension-safe cleanup, and adds a short same-dimension post-completion attach guard for vanilla victory BossBar rebinds. This stage does not change settlement keys, rewards, raid waves, baselineReset, waveChange or progress math.");
             }
             List<RaidEncounterSnapshot> snapshots = RaidEncounterAuthority.snapshots();
             Set<String> activeKeys = new HashSet<>();
@@ -116,6 +120,7 @@ public final class RaidIndependentBossbarManager {
                 bar.lastSeenGameTime = gameTime;
             }
             cleanupInactive(activeKeys, serverLevel, gameTime);
+            tickVictoryAttachGuards(serverLevel, gameTime);
         } catch (Throwable throwable) {
             if (!warnedTickFailure) {
                 warnedTickFailure = true;
@@ -715,7 +720,7 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(snapshot == null ? null : snapshot.key());
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.0.8-bossbar-victory-vanilla-final-suppress-alpha"
+                + " version=0.9.0.9-victory-bar-attach-guard-alpha"
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(snapshot == null ? null : snapshot.key())
@@ -754,7 +759,7 @@ public final class RaidIndependentBossbarManager {
         }
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.0.8-bossbar-victory-vanilla-final-suppress-alpha"
+                + " version=0.9.0.9-victory-bar-attach-guard-alpha"
                 + " playerKey=" + safeText(id)
                 + " player=" + safeText(playerDisplay(player))
                 + " success=" + success
@@ -1024,6 +1029,8 @@ public final class RaidIndependentBossbarManager {
                         "same-dimension completion cleanup started; minTicks=" + VICTORY_SUPPRESS_MIN_TICKS
                                 + "; stableZeroTicks=" + VICTORY_SUPPRESS_STABLE_ZERO_TICKS
                                 + "; suppressUntil=" + bar.cleanupSuppressUntilGameTime);
+                startVictoryAttachGuard(serverLevel, key, snapshot, gameTime,
+                        "completion-window-start; guardTicks=" + VICTORY_ATTACH_GUARD_TICKS);
             }
             if (!bar.independentCleanupDone) {
                 removeAllPlayers(bar.bossEvent, bar.players);
@@ -1077,12 +1084,178 @@ public final class RaidIndependentBossbarManager {
                                 + "; windowTicks=" + (gameTime - bar.inactiveSinceGameTime)
                                 + "; hardWindowElapsed=" + hardWindowElapsed
                                 + "; stableZeroElapsed=" + stableZeroElapsed);
+                startVictoryAttachGuard(serverLevel, key, snapshot, gameTime,
+                        "managed-entry-finished; guard-continues-after-BARS-remove");
                 remove.add(key);
             }
         }
         for (String key : remove) {
             BARS.remove(key);
         }
+    }
+
+
+    private static void startVictoryAttachGuard(Object serverLevel, String key, RaidEncounterSnapshot snapshot,
+                                                long gameTime, String note) {
+        if (key == null || key.isBlank() || snapshot == null) {
+            return;
+        }
+        if (!sameDimensionForCleanup(serverLevel, snapshot)) {
+            logVictoryAttachGuard("victory-attach-guard-skipped-different-dimension", serverLevel, key, snapshot,
+                    VICTORY_ATTACH_GUARDS.get(key), gameTime, false,
+                    "start skipped; bossbarDimension=" + safeText(snapshot.dimensionId())
+                            + "; levelDimension=" + safeText(dimensionIdForAudit(serverLevel))
+                            + "; note=" + safeText(note));
+            return;
+        }
+        VictoryAttachGuard guard = VICTORY_ATTACH_GUARDS.computeIfAbsent(key, ignored -> new VictoryAttachGuard());
+        if (guard.startedGameTime <= 0L) {
+            guard.startedGameTime = gameTime;
+        }
+        guard.key = key;
+        guard.snapshot = snapshot;
+        guard.dimensionId = snapshot.dimensionId();
+        guard.guardUntilGameTime = Math.max(guard.guardUntilGameTime, gameTime + VICTORY_ATTACH_GUARD_TICKS);
+        Object latestBossEvent = vanillaBossEvent(key);
+        if (latestBossEvent != null) {
+            guard.vanillaBossEvent = latestBossEvent;
+        }
+        logVictoryAttachGuard("victory-attach-guard-start", serverLevel, key, snapshot, guard, gameTime, true,
+                safeText(note) + "; guardUntil=" + guard.guardUntilGameTime
+                        + "; guardMinTicks=" + VICTORY_ATTACH_GUARD_MIN_TICKS
+                        + "; stableZeroTicks=" + VICTORY_ATTACH_GUARD_STABLE_ZERO_TICKS);
+    }
+
+    private static void tickVictoryAttachGuards(Object serverLevel, long gameTime) {
+        if (VICTORY_ATTACH_GUARDS.isEmpty()) {
+            return;
+        }
+        List<String> remove = new ArrayList<>();
+        for (Map.Entry<String, VictoryAttachGuard> entry : VICTORY_ATTACH_GUARDS.entrySet()) {
+            String key = entry.getKey();
+            VictoryAttachGuard guard = entry.getValue();
+            RaidEncounterSnapshot snapshot = guard == null ? null : guard.snapshot;
+            if (guard == null || snapshot == null) {
+                remove.add(key);
+                continue;
+            }
+            if (!sameDimensionForCleanup(serverLevel, snapshot)) {
+                logVictoryAttachGuard("victory-attach-guard-skipped-different-dimension", serverLevel, key, snapshot,
+                        guard, gameTime, false,
+                        "tick skipped; bossbarDimension=" + safeText(snapshot.dimensionId())
+                                + "; levelDimension=" + safeText(dimensionIdForAudit(serverLevel))
+                                + "; no attach guard outside owning dimension");
+                continue;
+            }
+            Object latestBossEvent = vanillaBossEvent(key);
+            if (latestBossEvent != null) {
+                guard.vanillaBossEvent = latestBossEvent;
+            }
+            Object bossEvent = guard.vanillaBossEvent;
+            String title = bossEventTitle(bossEvent);
+            boolean victoryBar = isVanillaVictoryBossbar(title);
+            boolean beforeVisible = bossEventVisible(bossEvent);
+            int beforePlayers = bossEventPlayerCount(bossEvent);
+            float beforeProgress = readBossEventProgressOrNaN(bossEvent);
+            boolean hidden = false;
+            boolean removedPlayers = false;
+            if (bossEvent != null && victoryBar) {
+                hidden = invokeOneArg(bossEvent, "setVisible", boolean.class, false);
+                removedPlayers = invokeNoArg(bossEvent, "removeAllPlayers");
+                if (!hidden && !removedPlayers) {
+                    invokeOneArg(bossEvent, "setVisible", boolean.class, false);
+                }
+            }
+            boolean afterVisible = bossEventVisible(bossEvent);
+            int afterPlayers = bossEventPlayerCount(bossEvent);
+            if (victoryBar) {
+                guard.suppressCount++;
+                if (beforeVisible || beforePlayers > 0) {
+                    guard.reappearedCount++;
+                    guard.lastReappearedGameTime = gameTime;
+                    guard.stableZeroSinceGameTime = -1L;
+                    logVictoryAttachGuard("victory-bar-attach-blocked", serverLevel, key, snapshot, guard, gameTime, true,
+                            "vanilla victory BossBar attempted to reattach/show; beforeVisible=" + beforeVisible
+                                    + "; beforePlayers=" + beforePlayers
+                                    + "; beforeProgress=" + progressText(beforeProgress)
+                                    + "; setVisibleFalse=" + hidden
+                                    + "; removeAllPlayers=" + removedPlayers
+                                    + "; afterVisible=" + afterVisible
+                                    + "; afterPlayers=" + afterPlayers);
+                } else if (!afterVisible && afterPlayers == 0) {
+                    if (guard.stableZeroSinceGameTime <= 0L) {
+                        guard.stableZeroSinceGameTime = gameTime;
+                    }
+                    if (guard.lastAuditGameTime <= 0L || gameTime - guard.lastAuditGameTime >= CLEANUP_AUDIT_INTERVAL_TICKS) {
+                        logVictoryAttachGuard("victory-attach-guard-stable-zero", serverLevel, key, snapshot, guard, gameTime, false,
+                                "victory bar still suppressed; suppressCount=" + guard.suppressCount
+                                        + "; stableZeroSince=" + guard.stableZeroSinceGameTime
+                                        + "; afterVisible=" + afterVisible
+                                        + "; afterPlayers=" + afterPlayers);
+                    }
+                } else {
+                    guard.stableZeroSinceGameTime = -1L;
+                }
+            }
+            boolean minElapsed = gameTime - guard.startedGameTime >= VICTORY_ATTACH_GUARD_MIN_TICKS;
+            boolean stableElapsed = guard.stableZeroSinceGameTime > 0L
+                    && gameTime - guard.stableZeroSinceGameTime >= VICTORY_ATTACH_GUARD_STABLE_ZERO_TICKS;
+            boolean hardElapsed = gameTime >= guard.guardUntilGameTime;
+            if ((minElapsed && stableElapsed) || hardElapsed) {
+                logVictoryAttachGuard("victory-attach-guard-summary", serverLevel, key, snapshot, guard, gameTime, true,
+                        "ending attach guard; suppressCount=" + guard.suppressCount
+                                + "; reappearedCount=" + guard.reappearedCount
+                                + "; lastReappeared=" + guard.lastReappearedGameTime
+                                + "; stableZeroSince=" + guard.stableZeroSinceGameTime
+                                + "; guardTicks=" + (gameTime - guard.startedGameTime)
+                                + "; hardElapsed=" + hardElapsed
+                                + "; stableElapsed=" + stableElapsed
+                                + "; finalVisible=" + afterVisible
+                                + "; finalPlayers=" + afterPlayers);
+                remove.add(key);
+            }
+        }
+        for (String key : remove) {
+            VICTORY_ATTACH_GUARDS.remove(key);
+        }
+    }
+
+    private static void logVictoryAttachGuard(String phase, Object serverLevel, String key, RaidEncounterSnapshot snapshot,
+                                             VictoryAttachGuard guard, long gameTime, boolean critical, String note) {
+        if (!KeyDiagnosticsConfig.ENABLED
+                || !KeyDiagnosticsConfig.LOG_BOSSBAR
+                || !KeyDiagnosticsConfig.ENABLE_BOSSBAR_VISIBLE_AUTHORITY_AUDIT) {
+            return;
+        }
+        if (!critical && guard != null && guard.lastAuditGameTime > 0L
+                && gameTime - guard.lastAuditGameTime < CLEANUP_AUDIT_INTERVAL_TICKS) {
+            return;
+        }
+        if (guard != null) {
+            guard.lastAuditGameTime = gameTime;
+        }
+        Object vanilla = guard == null ? vanillaBossEvent(key) : (guard.vanillaBossEvent != null ? guard.vanillaBossEvent : vanillaBossEvent(key));
+        String line = "[Raid Enhancement Patch][KeyDiag][VictoryBarAttachGuard] "
+                + "phase=" + safeText(phase)
+                + " version=0.9.0.9-victory-bar-attach-guard-alpha"
+                + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
+                + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
+                + " snapshot.key=" + safeText(key)
+                + " vanillaIdentity=" + bossEventIdentity(vanilla)
+                + " vanillaTitle=" + safeText(bossEventTitle(vanilla))
+                + " vanillaProgress=" + progressText(readBossEventProgressOrNaN(vanilla))
+                + " vanillaVisible=" + bossEventVisible(vanilla)
+                + " vanillaPlayerCount=" + bossEventPlayerCount(vanilla)
+                + " started=" + (guard == null ? -1 : guard.startedGameTime)
+                + " guardUntil=" + (guard == null ? -1 : guard.guardUntilGameTime)
+                + " suppressCount=" + (guard == null ? -1 : guard.suppressCount)
+                + " reappearedCount=" + (guard == null ? -1 : guard.reappearedCount)
+                + " stableZeroSince=" + (guard == null ? -1 : guard.stableZeroSinceGameTime)
+                + " gameTime=" + gameTime
+                + " levelDimension=" + dimensionIdForAudit(serverLevel)
+                + " note=" + safeText(note) + ".";
+        System.out.println(line);
+        appendAuthorityDiagnosticFile(line);
     }
 
     private static SuppressResult suppressVanillaForCleanup(Object serverLevel, String key, RaidEncounterSnapshot snapshot,
@@ -1164,7 +1337,7 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(key);
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarCleanupAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.0.8-bossbar-victory-vanilla-final-suppress-alpha"
+                + " version=0.9.0.9-victory-bar-attach-guard-alpha"
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(key)
@@ -1525,6 +1698,21 @@ public final class RaidIndependentBossbarManager {
             byName.put(key, found);
             return found;
         }
+    }
+
+
+    private static final class VictoryAttachGuard {
+        String key;
+        String dimensionId;
+        RaidEncounterSnapshot snapshot;
+        Object vanillaBossEvent;
+        long startedGameTime = -1L;
+        long guardUntilGameTime = -1L;
+        long stableZeroSinceGameTime = -1L;
+        long lastReappearedGameTime = -1L;
+        long lastAuditGameTime = -1L;
+        int suppressCount;
+        int reappearedCount;
     }
 
     private static final class ManagedBossbar {
