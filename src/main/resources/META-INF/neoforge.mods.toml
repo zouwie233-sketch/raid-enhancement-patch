@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.0.7-bossbar-dimension-safe-cleanup-alpha"
+version="0.9.0.8-bossbar-victory-vanilla-final-suppress-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.0.7 keeps the tested 0.9.0.3 RaidInstanceKey settlement fix and the 0.9.0.5 confirmed [REP] independent BossBar path. It applies a dimension-safe guard to completion cleanup so Nether/End ticks cannot mark an Overworld BossBar inactive. Cross-dimension cleanup attempts are logged as skipped-different-dimension instead of clearing the bar. This stage does not modify settlement keys, VillageFavor, rewards, villager gifts, raid wave counts, RaidWaveAuthority, RaidWaveExpansionController, the core progress algorithm, persistent data, or the wave-8 crash guard.
+Stage 0.9.0.8 keeps the tested 0.9.0.3 RaidInstanceKey settlement fix, the 0.9.0.5 confirmed [REP] independent BossBar path, and the 0.9.0.7 dimension-safe cleanup guard. It extends and densifies the same-dimension post-completion suppress window for the vanilla victory BossBar (`event.minecraft.raid.victory.full`) so delayed vanilla player rebinds are removed before the managed cleanup entry is discarded. This stage does not modify settlement keys, VillageFavor, rewards, villager gifts, raid wave counts, RaidWaveAuthority, RaidWaveExpansionController, baselineReset, waveChange, the core progress algorithm, persistent data, or the wave-8 crash guard.
 '''
 
 [[mixins]]
