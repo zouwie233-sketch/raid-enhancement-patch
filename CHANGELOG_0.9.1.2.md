@@ -4,20 +4,20 @@ Version: `0.9.1.2-key-audit-polish-alpha`
 
 ## Type
 
-Low-risk architecture governance / key audit build.
+Low-risk Key audit polish build.
 
 ## Added
 
-- Added `RaidKeyService` as a read-only key boundary helper.
-- Added `KeyDebugService` as a read-only key diagnostic facade.
-- Added key-boundary audit fields to `RaidKeyDiagnostics` startup, raid discovery, settlement, favor-record, and BossBar diagnostic lines.
-- Added dimension duplication audit warnings that only report suspicious key strings and do not rewrite or normalize active gameplay keys.
+- Added `keyAuditPolish=0.9.1.2` diagnostic marker.
+- Added `actualKeyFormatUnchanged=true` and `keyFormatChange=false` diagnostic markers.
+- Added `dimensionDuplicationAny` and `dimensionDuplicationSummary` fields.
+- Added explicit recommendation text when duplicated dimension tokens are detected.
 
 ## Preserved
 
+- 0.9.1.1 Key Service audit behavior.
 - 0.9.1.0 BossBar behavior.
 - `[REP]` independent BossBar visible authority.
-- Same-wave refill suppression.
 - Dimension-safe cleanup.
 - `VictoryBarAttachGuard` vanilla victory BossBar rebind suppression.
 - `settlementKeyMode=raidInstance` behavior.
@@ -25,7 +25,8 @@ Low-risk architecture governance / key audit build.
 
 ## Not changed
 
-- No VillageKey drift fix in this version.
+- No real key format normalization.
+- No VillageKey drift fix.
 - No VillageFavor behavior change.
 - No settlement key rewrite.
 - No BossBar progress algorithm change.

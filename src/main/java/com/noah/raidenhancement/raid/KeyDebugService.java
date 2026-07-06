@@ -1,7 +1,7 @@
 package com.noah.raidenhancement.raid;
 
 /**
- * 0.9.1.1 key debug facade.
+ * 0.9.1.2 key audit polish facade.
  *
  * This class does not generate authoritative gameplay keys and does not decide
  * whether a raid may settle. Its only job in this stage is to make diagnostic
@@ -16,7 +16,9 @@ public final class KeyDebugService {
                 + " keyService=RaidKeyService"
                 + " keyServiceStage=" + RaidKeyService.STAGE
                 + " keyAuditMode=" + RaidKeyService.AUDIT_MODE
-                + " note=0.9.1.1 adds read-only key boundary diagnostics only.";
+                + " keyAuditPolish=0.9.1.2"
+                + " actualKeyFormatUnchanged=true"
+                + " note=0.9.1.2 keeps read-only key boundary diagnostics and adds audit-polish summary fields only.";
     }
 
     public static String boundarySummary() {

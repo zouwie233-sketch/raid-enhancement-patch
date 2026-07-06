@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 0.9.0.9: vanilla victory BossBar attach guard presenter.
+ * 0.9.1.3: BossBar module boundary audit presenter.
  *
  * The previous UI path fought vanilla Raid's own ServerBossEvent#setName calls.
  * That reduced but could not eliminate title flicker. This manager creates one
@@ -69,7 +69,7 @@ public final class RaidIndependentBossbarManager {
             long gameTime = gameTime(serverLevel);
             if (!announced) {
                 announced = true;
-                System.out.println("[Raid Enhancement Patch] 0.9.1.1 Key Service audit stage is active. The mod-owned BossBar keeps the tested [REP] marker, dimension-safe cleanup, and same-dimension VictoryBarAttachGuard; this stage adds read-only RaidKeyService / KeyDebugService diagnostics and does not change settlement keys, rewards, raid waves, baselineReset, waveChange or progress math.");
+                System.out.println("[Raid Enhancement Patch] 0.9.1.3 BossBar module boundary audit stage is active. The mod-owned [REP] BossBar path keeps the tested 0.9.1.0 behavior, 0.9.1.2 Key audit fields, dimension-safe cleanup, and same-dimension VictoryBarAttachGuard. This stage adds diagnostic-only BossBar boundary fields and does not change progress math, waveChange, baselineReset, settlement keys, key formats, rewards, raid waves or VillageFavor.");
             }
             List<RaidEncounterSnapshot> snapshots = RaidEncounterAuthority.snapshots();
             Set<String> activeKeys = new HashSet<>();
@@ -720,7 +720,8 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(snapshot == null ? null : snapshot.key());
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.1-key-service-audit-alpha"
+                + " version=0.9.1.3-bossbar-module-boundary-alpha"
+                + BossBarAuditLogger.commonBoundaryFields("BossBarAuthorityAudit")
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(snapshot == null ? null : snapshot.key())
@@ -746,7 +747,7 @@ public final class RaidIndependentBossbarManager {
                 + " diagRefillAttempt=" + (bar != null && bar.diagRefillAttempt)
                 + " gameTime=" + gameTime
                 + " levelDimension=" + dimensionIdForAudit(serverLevel)
-                + " note=" + safeText(note) + ".";
+                + " note=" + safeText(note) + "; boundarySummary=" + BossBarAuditLogger.boundarySummary() + ".";
         System.out.println(line);
         appendAuthorityDiagnosticFile(line);
     }
@@ -759,7 +760,8 @@ public final class RaidIndependentBossbarManager {
         }
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.1-key-service-audit-alpha"
+                + " version=0.9.1.3-bossbar-module-boundary-alpha"
+                + BossBarAuditLogger.commonBoundaryFields("BossBarPlayerBindingAudit")
                 + " playerKey=" + safeText(id)
                 + " player=" + safeText(playerDisplay(player))
                 + " success=" + success
@@ -1237,7 +1239,8 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = guard == null ? vanillaBossEvent(key) : (guard.vanillaBossEvent != null ? guard.vanillaBossEvent : vanillaBossEvent(key));
         String line = "[Raid Enhancement Patch][KeyDiag][VictoryBarAttachGuard] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.1-key-service-audit-alpha"
+                + " version=0.9.1.3-bossbar-module-boundary-alpha"
+                + BossBarAuditLogger.commonBoundaryFields("VictoryBarAttachGuard")
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(key)
@@ -1337,7 +1340,8 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(key);
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarCleanupAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.1-key-service-audit-alpha"
+                + " version=0.9.1.3-bossbar-module-boundary-alpha"
+                + BossBarAuditLogger.commonBoundaryFields("BossBarCleanupAudit")
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(key)

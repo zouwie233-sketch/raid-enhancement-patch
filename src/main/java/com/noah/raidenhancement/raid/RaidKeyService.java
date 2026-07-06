@@ -3,16 +3,16 @@ package com.noah.raidenhancement.raid;
 import java.util.UUID;
 
 /**
- * 0.9.1.1 key boundary service.
+ * 0.9.1.2 key audit polish service.
  *
  * This service is intentionally read-only and string-format focused in this stage.
  * It centralizes key naming, descriptions, and audit helpers without changing the
- * already-tested 0.9.1.0 gameplay behavior: settlement remains raidInstance based,
+ * already-tested gameplay behavior: settlement remains raidInstance based,
  * VillageFavor still owns long-term village records, and no persistence migration
- * is attempted here.
+ * is attempted here. 0.9.1.2 only makes the audit output easier to interpret.
  */
 public final class RaidKeyService {
-    public static final String STAGE = "0.9.1.1-key-service-audit-alpha";
+    public static final String STAGE = "0.9.1.2-key-audit-polish-alpha";
     public static final String AUDIT_MODE = "readOnly-no-gameplay-behavior-change";
 
     private RaidKeyService() {
@@ -82,19 +82,46 @@ public final class RaidKeyService {
                                            String villageKey,
                                            String settlementKey,
                                            String favorRecordKey) {
+        boolean raidInstanceDup = hasDuplicatedDimensionToken(raidInstanceKey, dimensionId);
+        boolean villageDup = hasDuplicatedDimensionToken(villageKey, dimensionId);
+        boolean settlementDup = hasDuplicatedDimensionToken(settlementKey, dimensionId);
+        boolean favorDup = hasDuplicatedDimensionToken(favorRecordKey, dimensionId);
+        boolean anyDup = raidInstanceDup || villageDup || settlementDup || favorDup;
         return " keyServiceStage=" + STAGE
                 + " keyAuditMode=" + AUDIT_MODE
+                + " keyAuditPolish=0.9.1.2"
+                + " actualKeyFormatUnchanged=true"
+                + " keyFormatChange=false"
                 + " sourceModule=" + safe(sourceModule)
                 + " keyBoundary=raidInstanceKey:single-raid,villageKey:long-term-village,settlementKey:raidInstance,favorRecordKey:player-plus-village"
                 + " raidInstancePurpose=" + keyPurpose("raidInstanceKey")
                 + " villagePurpose=" + keyPurpose("villageKey")
                 + " settlementPurpose=" + keyPurpose("settlementKey")
                 + " favorRecordPurpose=" + keyPurpose("favorRecordKey")
+                + " dimensionDuplicationAny=" + anyDup
+                + " dimensionDuplicationSummary=" + dimensionDuplicationSummary(raidInstanceDup, villageDup, settlementDup, favorDup)
+                + " dimensionDuplicationRecommendation=" + dimensionDuplicationRecommendation(anyDup)
                 + " " + dimensionDuplicationAudit("raidInstanceKey", raidInstanceKey, dimensionId)
                 + " " + dimensionDuplicationAudit("villageKey", villageKey, dimensionId)
                 + " " + dimensionDuplicationAudit("settlementKey", settlementKey, dimensionId)
                 + " " + dimensionDuplicationAudit("favorRecordKey", favorRecordKey, dimensionId)
                 + " center=" + center(centerX, centerY, centerZ);
+    }
+
+    public static String dimensionDuplicationSummary(boolean raidInstanceDup,
+                                                     boolean villageDup,
+                                                     boolean settlementDup,
+                                                     boolean favorDup) {
+        return "raidInstanceKey:" + raidInstanceDup
+                + ",villageKey:" + villageDup
+                + ",settlementKey:" + settlementDup
+                + ",favorRecordKey:" + favorDup;
+    }
+
+    public static String dimensionDuplicationRecommendation(boolean anyDup) {
+        return anyDup
+                ? "audit-only-defer-normalization-to-future-key-format-version"
+                : "none";
     }
 
     static String sanitizeDimension(String input) {

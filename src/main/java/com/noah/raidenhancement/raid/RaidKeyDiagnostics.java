@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Opt-in key-chain diagnostics with 0.9.1.1 read-only Key Service audit fields.
+ * Opt-in key-chain diagnostics with 0.9.1.2 read-only Key Service audit fields.
  *
  * This class is intentionally read-only: it prints candidate/actual keys and
  * BossBar state snapshots, but does not decide raid completion, settlement

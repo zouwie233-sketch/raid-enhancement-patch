@@ -2,7 +2,7 @@
 
 ## Version
 
-`0.9.1.1-key-service-audit-alpha`
+`0.9.1.2-key-audit-polish-alpha`
 
 ## Goal
 

@@ -1,6 +1,6 @@
-# BUILD_VERIFICATION_0.9.1.1
+# BUILD_VERIFICATION_0.9.1.2
 
-Version: `0.9.1.1-key-service-audit-alpha`
+Version: `0.9.1.2-key-audit-polish-alpha`
 
 ## Build status
 
@@ -16,11 +16,11 @@ This is not claimed as a local Gradle clean build.
 
 ## Metadata updated
 
-- `gradle.properties`: `mod_version=0.9.1.1-key-service-audit-alpha`
-- `RaidEnhancementPatch.java`: `VERSION=0.9.1.1-key-service-audit-alpha` in source
-- `META-INF/neoforge.mods.toml`: `version="0.9.1.1-key-service-audit-alpha"`
-- `META-INF/MANIFEST.MF`: `Implementation-Version: 0.9.1.1-key-service-audit-alpha`
-- Key BossBar diagnostic version strings patched to `0.9.1.1-key-service-audit-alpha`
+- `gradle.properties`: `mod_version=0.9.1.2-key-audit-polish-alpha`
+- `RaidEnhancementPatch.java`: `VERSION=0.9.1.2-key-audit-polish-alpha` in source
+- `META-INF/neoforge.mods.toml`: `version="0.9.1.2-key-audit-polish-alpha"`
+- `META-INF/MANIFEST.MF`: `Implementation-Version: 0.9.1.2-key-audit-polish-alpha`
+- Key BossBar diagnostic version strings patched to `0.9.1.2-key-audit-polish-alpha`
 
 ## Static checks required after packaging
 

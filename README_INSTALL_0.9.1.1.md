@@ -1,10 +1,10 @@
-# README_INSTALL_0.9.1.1
+# README_INSTALL_0.9.1.2
 
-Version: `0.9.1.1-key-service-audit-alpha`
+Version: `0.9.1.2-key-audit-polish-alpha`
 
 ## Purpose
 
-This is the 0.9.1.1 Key Service audit build. It preserves the tested 0.9.1.0 BossBar / settlementKey safety anchor and adds read-only key-boundary diagnostics.
+This is the 0.9.1.2 Key Service audit build. It preserves the tested 0.9.1.0 BossBar / settlementKey safety anchor and adds read-only key-boundary diagnostics.
 
 ## Install
 
@@ -12,7 +12,7 @@ This is the 0.9.1.1 Key Service audit build. It preserves the tested 0.9.1.0 Bos
 2. Remove the old `raid_enhancement_patch` jar from the `mods` folder.
 3. Copy this jar into `mods`:
 
-`raid_enhancement_patch-0.9.1.1-key-service-audit-alpha.jar`
+`raid_enhancement_patch-0.9.1.2-key-audit-polish-alpha.jar`
 
 4. For a clean diagnostic test, delete only:
 
@@ -32,7 +32,7 @@ Added source and compiled classes:
 
 `RaidKeyDiagnostics` now appends read-only audit fields such as:
 
-- `keyServiceStage=0.9.1.1-key-service-audit-alpha`
+- `keyServiceStage=0.9.1.2-key-audit-polish-alpha`
 - `keyAuditMode=readOnly-no-gameplay-behavior-change`
 - `keyBoundarySummary=RaidInstanceKey(...);VillageKey(...);SettlementKey(...);FavorRecordKey(...)`
 - `dimensionDuplication=false` or warning fields when a key appears to duplicate its dimension token
