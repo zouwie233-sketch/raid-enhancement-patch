@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.1.0-victory-bar-attach-guard-alpha"
+version="0.9.1.1-key-service-audit-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.1.0 keeps the tested 0.9.0.3 RaidInstanceKey settlement fix, the 0.9.0.5 confirmed [REP] independent BossBar path, and the 0.9.0.7 dimension-safe cleanup guard. It adds a short same-dimension VictoryBarAttachGuard after raid completion so the vanilla victory BossBar (`event.minecraft.raid.victory.full`) cannot visibly rebind players after the managed [REP] entry is removed. This stage does not modify settlement keys, VillageFavor, rewards, villager gifts, raid wave counts, RaidWaveAuthority, RaidWaveExpansionController, baselineReset, waveChange, the core progress algorithm, persistent data, or the wave-8 crash guard.
+Stage 0.9.1.1 preserves the tested 0.9.1.0 BossBar / settlementKey safety anchor: the 0.9.0.3 RaidInstanceKey settlement fix, the 0.9.0.5 confirmed [REP] independent BossBar path, the 0.9.0.7 dimension-safe cleanup guard, and the same-dimension VictoryBarAttachGuard for vanilla victory BossBar rebinds. This stage adds read-only RaidKeyService / KeyDebugService key-boundary audit fields. It does not modify settlement keys, VillageFavor behavior, rewards, villager gifts, raid wave counts, RaidWaveAuthority, RaidWaveExpansionController, baselineReset, waveChange, the core progress algorithm, persistent data, or the wave-8 crash guard.
 '''
 
 [[mixins]]

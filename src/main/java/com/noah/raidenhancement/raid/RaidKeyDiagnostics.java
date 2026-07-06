@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Opt-in key-chain diagnostics for Stage 0.9.0.2.
+ * Opt-in key-chain diagnostics with 0.9.1.1 read-only Key Service audit fields.
  *
  * This class is intentionally read-only: it prints candidate/actual keys and
  * BossBar state snapshots, but does not decide raid completion, settlement
@@ -49,6 +49,8 @@ public final class RaidKeyDiagnostics {
                 + " bossbar=" + KeyDiagnosticsConfig.LOG_BOSSBAR
                 + " storagePaths=" + KeyDiagnosticsConfig.LOG_STORAGE_PATHS
                 + " intervalTicks=" + KeyDiagnosticsConfig.LOG_INTERVAL_TICKS
+                + " " + KeyDebugService.startupMarker()
+                + " " + KeyDebugService.boundarySummary()
                 + " note=diagnostic-only-no-gameplay-behavior-change.");
     }
 
@@ -82,6 +84,8 @@ public final class RaidKeyDiagnostics {
                 + " nativeRaidIdentity=" + nativeIdentity(nativeRaid)
                 + " firstSeenGameTime=" + firstSeenGameTime
                 + " gameTime=" + gameTime
+                + KeyDebugService.auditFields("raid-discovery", dimensionId, centerX, centerY, centerZ,
+                raidInstanceCandidate, villageKey, raidInstanceCandidate, "unknown")
                 + " levelDimension=" + dimensionId(level) + ".");
     }
 
@@ -120,6 +124,8 @@ public final class RaidKeyDiagnostics {
                 + " omenLevel=" + omenLevel
                 + " totalWaves=" + totalWaves
                 + " eligiblePlayerFavorKeys=" + playerKeys
+                + KeyDebugService.auditFields("settlement", dimensionId, centerX, centerY, centerZ,
+                raidInstanceCandidate, villageKey, settlement, "listed-in-eligiblePlayerFavorKeys")
                 + " completedGameTime=" + gameTime
                 + " levelDimension=" + dimensionId(level) + ".");
     }
@@ -148,6 +154,8 @@ public final class RaidKeyDiagnostics {
                 + " victoryCount=" + (record == null ? -1 : record.victoryCount)
                 + " highestOmenLevelWon=" + (record == null ? -1 : record.highestOmenLevelWon)
                 + " raidMeritScore=" + (record == null ? -1 : record.raidMeritScore)
+                + KeyDebugService.auditFields("favor-record", dimensionId, centerX, centerY, centerZ,
+                "unknown", villageKey(dimensionId, centerX, centerY, centerZ), "unknown", safe(favorRecordKey))
                 + " gameTime=" + gameTime
                 + " levelDimension=" + dimensionId(level) + ".");
     }
@@ -223,6 +231,9 @@ public final class RaidKeyDiagnostics {
                 + " raidSessionKeyCandidate=" + safe(snapshot.key())
                 + " villageKey=" + villageKey(snapshot.dimensionId(), snapshot.centerX(), snapshot.centerY(), snapshot.centerZ())
                 + " raidInstanceKeyCandidate=" + raidInstanceCandidate(snapshot.dimensionId(), snapshot.key(), safeHash(snapshot.key()), snapshot.gameTime(), null)
+                + KeyDebugService.auditFields("bossbar", snapshot.dimensionId(), snapshot.centerX(), snapshot.centerY(), snapshot.centerZ(),
+                raidInstanceCandidate(snapshot.dimensionId(), snapshot.key(), safeHash(snapshot.key()), snapshot.gameTime(), null),
+                villageKey(snapshot.dimensionId(), snapshot.centerX(), snapshot.centerY(), snapshot.centerZ()), "unknown", "unknown")
                 + " wave=" + snapshot.currentWave()
                 + " currentWave=" + snapshot.currentWave()
                 + " totalWaves=" + snapshot.totalWaves()
@@ -265,14 +276,11 @@ public final class RaidKeyDiagnostics {
     }
 
     public static String villageKey(String dimensionId, int centerX, int centerY, int centerZ) {
-        return sanitize(dimensionId) + "@village:center:" + centerX + "," + centerY + "," + centerZ;
+        return RaidKeyService.villageKey(dimensionId, centerX, centerY, centerZ);
     }
 
     public static String raidInstanceCandidate(String dimensionId, String stateOrRaidKey, int sessionRaidId, long firstSeenGameTime, Object nativeRaid) {
-        return sanitize(dimensionId) + "@raidInstance:candidate:" + safe(stateOrRaidKey)
-                + "#sessionRaidId=" + sessionRaidId
-                + "#firstSeen=" + firstSeenGameTime
-                + "#nativeIdentity=" + nativeIdentity(nativeRaid);
+        return RaidKeyService.raidInstanceCandidate(dimensionId, stateOrRaidKey, sessionRaidId, firstSeenGameTime, nativeRaid);
     }
 
     private static void emit(String category, String message) {

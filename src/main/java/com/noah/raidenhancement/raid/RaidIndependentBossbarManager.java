@@ -69,7 +69,7 @@ public final class RaidIndependentBossbarManager {
             long gameTime = gameTime(serverLevel);
             if (!announced) {
                 announced = true;
-                System.out.println("[Raid Enhancement Patch] 0.9.1.0 BossBar victory attach guard stage is active. The mod-owned BossBar keeps the temporary [REP] marker, preserves dimension-safe cleanup, and adds a short same-dimension post-completion attach guard for vanilla victory BossBar rebinds. This stage does not change settlement keys, rewards, raid waves, baselineReset, waveChange or progress math.");
+                System.out.println("[Raid Enhancement Patch] 0.9.1.1 Key Service audit stage is active. The mod-owned BossBar keeps the tested [REP] marker, dimension-safe cleanup, and same-dimension VictoryBarAttachGuard; this stage adds read-only RaidKeyService / KeyDebugService diagnostics and does not change settlement keys, rewards, raid waves, baselineReset, waveChange or progress math.");
             }
             List<RaidEncounterSnapshot> snapshots = RaidEncounterAuthority.snapshots();
             Set<String> activeKeys = new HashSet<>();
@@ -720,7 +720,7 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(snapshot == null ? null : snapshot.key());
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.0-victory-bar-attach-guard-alpha"
+                + " version=0.9.1.1-key-service-audit-alpha"
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(snapshot == null ? null : snapshot.key())
@@ -759,7 +759,7 @@ public final class RaidIndependentBossbarManager {
         }
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.0-victory-bar-attach-guard-alpha"
+                + " version=0.9.1.1-key-service-audit-alpha"
                 + " playerKey=" + safeText(id)
                 + " player=" + safeText(playerDisplay(player))
                 + " success=" + success
@@ -1237,7 +1237,7 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = guard == null ? vanillaBossEvent(key) : (guard.vanillaBossEvent != null ? guard.vanillaBossEvent : vanillaBossEvent(key));
         String line = "[Raid Enhancement Patch][KeyDiag][VictoryBarAttachGuard] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.0-victory-bar-attach-guard-alpha"
+                + " version=0.9.1.1-key-service-audit-alpha"
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(key)
@@ -1337,7 +1337,7 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(key);
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarCleanupAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.0-victory-bar-attach-guard-alpha"
+                + " version=0.9.1.1-key-service-audit-alpha"
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(key)
