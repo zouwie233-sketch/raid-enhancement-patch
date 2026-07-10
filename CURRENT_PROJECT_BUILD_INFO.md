@@ -2,8 +2,15 @@
 
 Current line: 0.9.1.x architecture governance line
 
-Current delivery: `0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha`
+Current delivery: `0.9.1.4-victory-settlement-boundary-audit-alpha`
 
 Baseline anchor: `0.9.1.0-victory-bar-attach-guard-alpha` passed BossBar / settlementKey regression candidate testing.
 
-0.9.1.3 completed the BossBar module boundary audit candidate, but testing found excessive audit output: approximately 4185 `hide-vanilla` records in about six minutes and full GameProfile payloads in player-binding records. 0.9.1.3.1 is a diagnostic-only hotfix that throttles those records without changing runtime behavior.
+Passed candidates before this delivery:
+
+- 0.9.1.1 Key Service audit;
+- 0.9.1.2 Key audit polish;
+- 0.9.1.3 BossBar module boundary;
+- 0.9.1.3.1 BossBar audit throttle.
+
+0.9.1.4 adds a diagnostic-only immutable `RaidCompletionResult` projection at the existing victory-settlement boundary. It does not migrate any runtime consumer and requires in-game verification before candidate promotion.

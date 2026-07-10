@@ -33,6 +33,7 @@ public final class RaidKeyDiagnostics {
     private static final Logger LOGGER = LoggerFactory.getLogger("RaidEnhancementPatchKeyDiag");
     private static final Map<String, Long> LAST_LOG_BY_EVENT_AND_KEY = new LinkedHashMap<>();
     private static boolean warnedFileOutput;
+    private static boolean warnedVictorySettlementBoundaryAudit;
 
     private RaidKeyDiagnostics() {
     }
@@ -51,6 +52,7 @@ public final class RaidKeyDiagnostics {
                 + " intervalTicks=" + KeyDiagnosticsConfig.LOG_INTERVAL_TICKS
                 + " " + KeyDebugService.startupMarker()
                 + " " + KeyDebugService.boundarySummary()
+                + " " + VictorySettlementBoundaryAudit.startupMarker()
                 + " note=diagnostic-only-no-gameplay-behavior-change.");
     }
 
@@ -128,6 +130,55 @@ public final class RaidKeyDiagnostics {
                 raidInstanceCandidate, villageKey, settlement, "listed-in-eligiblePlayerFavorKeys")
                 + " completedGameTime=" + gameTime
                 + " levelDimension=" + dimensionId(level) + ".");
+        logVictorySettlementBoundary(phase, dimensionId, centerX, centerY, centerZ,
+                raidInstanceCandidate, villageKey, settlementKeyMode, gameTime,
+                omenLevel, totalWaves, eligiblePlayers);
+    }
+
+    private static void logVictorySettlementBoundary(String phase,
+                                                      String dimensionId,
+                                                      int centerX,
+                                                      int centerY,
+                                                      int centerZ,
+                                                      String raidInstanceKey,
+                                                      String villageKey,
+                                                      String settlementKeyMode,
+                                                      long gameTime,
+                                                      int omenLevel,
+                                                      int totalWaves,
+                                                      Collection<? extends Player> eligiblePlayers) {
+        if (!VictorySettlementBoundaryAudit.isBoundaryPhase(phase)) {
+            return;
+        }
+        try {
+            List<UUID> eligiblePlayerUuids = playerUuids(eligiblePlayers);
+            boolean eligiblePlayersResolved = eligiblePlayers != null;
+            RaidCompletionResult result = VictorySettlementBoundaryAudit.project(
+                    raidInstanceKey,
+                    villageKey,
+                    dimensionId,
+                    centerX,
+                    centerY,
+                    centerZ,
+                    eligiblePlayerUuids,
+                    omenLevel,
+                    totalWaves,
+                    gameTime
+            );
+            emit("victory-settlement-boundary",
+                    VictorySettlementBoundaryAudit.auditFields(
+                            phase,
+                            result,
+                            eligiblePlayersResolved,
+                            settlementKeyMode
+                    ));
+        } catch (Throwable throwable) {
+            if (!warnedVictorySettlementBoundaryAudit) {
+                warnedVictorySettlementBoundaryAudit = true;
+                LOGGER.warn("[Raid Enhancement Patch][KeyDiag][victory-settlement-boundary] audit projection failed once and was suppressed: {}",
+                        throwable.toString());
+            }
+        }
     }
 
     public static void logFavorRecord(String phase,
@@ -347,6 +398,19 @@ public final class RaidKeyDiagnostics {
         }
         builder.append(']');
         return builder.toString();
+    }
+
+    private static List<UUID> playerUuids(Collection<? extends Player> players) {
+        if (players == null || players.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> result = new java.util.ArrayList<>();
+        for (Player player : players) {
+            if (player != null && player.getUUID() != null && !result.contains(player.getUUID())) {
+                result.add(player.getUUID());
+            }
+        }
+        return List.copyOf(result);
     }
 
     private static boolean shouldLog(String event, String key, long gameTime) {

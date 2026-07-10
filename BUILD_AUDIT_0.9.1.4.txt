@@ -1,0 +1,47 @@
+Raid Enhancement Patch 0.9.1.4 build audit
+
+Version: 0.9.1.4-victory-settlement-boundary-audit-alpha
+Scope: diagnostic-only VictorySettlement boundary audit
+
+BUILD METHOD
+- Full Gradle compile attempted: YES
+- Gradle result: FAILED before compilation because services.gradle.org could not be resolved (UnknownHostException)
+- Local fallback: Java 21 javac --release 21 against the tested 0.9.1.3.1 binary base
+- JAR method: replace changed project classes and metadata, add two project classes, then repack
+- Claimed as Gradle clean build: NO
+
+CHANGED/NEW RUNTIME CLASSES
+- com.noah.raidenhancement.RaidEnhancementPatch
+- com.noah.raidenhancement.raid.RaidKeyDiagnostics
+- com.noah.raidenhancement.raid.RaidCompletionResult (new)
+- com.noah.raidenhancement.raid.VictorySettlementBoundaryAudit (new)
+
+INTENDED DIAGNOSTIC CHANGES
+- Create a read-only RaidCompletionResult projection at before-history-check.
+- Create a second projection at accepted-before-rewards after eligible players/effective omen/effective waves are resolved.
+- Emit concise victory-settlement-boundary records.
+- State explicitly that the projection is not runtime authority and consumers still use legacy arguments.
+
+BEHAVIOR PROTECTION
+- VictorySettlementController changed: NO
+- VillageSecurityController changed: NO
+- Runtime settlement order changed: NO
+- Duplicate guard changed: NO
+- Reward dispatch changed: NO
+- VillageFavor write changed: NO
+- BossBar/cleanup/VictoryBarAttachGuard changed: NO
+- settlementKey/RaidInstanceKey/VillageKey/key format changed: NO
+- Raid waves/persistence/Mixin enablement changed: NO
+
+STATIC RESULT
+- JAR archive integrity: PASS
+- Java class major version: 65 / Java 21
+- Pure boundary projection self-test: PASS
+- JAR entry diff: only RaidCompletionResult.class and VictorySettlementBoundaryAudit.class added
+- All unchanged project classes byte-identical to 0.9.1.3.1: PASS
+- Compile-time stub classes in output JAR: NONE
+- ServerBossEventRaidTitleMixin enabled: NO
+
+RUNTIME STATUS
+- In-game regression: PENDING
+- Promotion status: test-only alpha candidate

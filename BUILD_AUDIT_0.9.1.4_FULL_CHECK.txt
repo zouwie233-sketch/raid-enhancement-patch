@@ -1,0 +1,26 @@
+FULL STATIC CHECK — 0.9.1.4-victory-settlement-boundary-audit-alpha
+
+[PASS] JAR exists and unzip -t reports no errors.
+[PASS] MANIFEST Implementation-Version is 0.9.1.4-victory-settlement-boundary-audit-alpha.
+[PASS] neoforge.mods.toml version is 0.9.1.4-victory-settlement-boundary-audit-alpha.
+[PASS] RaidEnhancementPatch.VERSION is compiled as 0.9.1.4-victory-settlement-boundary-audit-alpha.
+[PASS] RaidCompletionResult is an immutable Java record.
+[PASS] VictorySettlementBoundaryAudit is diagnostic-only and declares audit-projection-only-no-runtime-consumer-change.
+[PASS] Startup marker declares raidCompletionResultRuntimeAuthority=false.
+[PASS] Boundary audit declares runtimeSettlementOrderChanged=false.
+[PASS] Boundary audit declares duplicateGuardChanged=false.
+[PASS] Boundary audit declares rewardDispatchChanged=false.
+[PASS] Boundary audit declares villageFavorWriteChanged=false.
+[PASS] Boundary audit declares cleanupChanged=false and keyFormatChanged=false.
+[PASS] Boundary records are limited to before-history-check and accepted-before-rewards.
+[PASS] Boundary records declare consumersStillUseLegacyArguments=true.
+[PASS] VictorySettlementController source/class is unchanged from 0.9.1.3.1.
+[PASS] VillageSecurityController source/class is unchanged from 0.9.1.3.1.
+[PASS] All other unchanged project class bytes match 0.9.1.3.1.
+[PASS] ServerBossEventRaidTitleMixin is absent from enabled Mixin lists.
+[PASS] No net/minecraft, net/neoforged or org/slf4j compile-time stub classes were added to the JAR.
+[PASS] Java class major version is 65 (Java 21).
+[PASS] Synthetic projection test passed with duplicate player UUID normalization and required audit fields.
+
+[NOT VERIFIED] Gradle clean build — network resolution failure for services.gradle.org.
+[NOT VERIFIED] In-game settlement/BossBar regression and real log output — requires user testing.
