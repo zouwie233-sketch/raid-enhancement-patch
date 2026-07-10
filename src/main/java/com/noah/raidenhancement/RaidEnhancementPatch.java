@@ -26,7 +26,7 @@ import net.neoforged.fml.common.Mod;
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.3-bossbar-module-boundary-alpha";
+    public static final String VERSION = "0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -46,7 +46,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Keeps the 0.9.1.0 BossBar / settlementKey safety anchor and the 0.9.1.2 Key audit polish fields, then adds BossBar module boundary diagnostics only. It does not change BossBar progress math, waveChange, baselineReset, settlement keys, key formats, raid waves, rewards, VillageFavor, villager gifts, persistent data, VictoryBarAttachGuard behavior or the ServerBossEventRaidTitleMixin disabled state.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Keeps the tested 0.9.1.3 BossBar module boundaries and runtime behavior, then throttles repeated BossBar audit output and removes full GameProfile payloads from player-binding logs. It does not change BossBar progress math, waveChange, baselineReset, settlement keys, key formats, raid waves, rewards, VillageFavor, villager gifts, persistent data, VictoryBarAttachGuard behavior or the ServerBossEventRaidTitleMixin disabled state.");
     }
 
     /**

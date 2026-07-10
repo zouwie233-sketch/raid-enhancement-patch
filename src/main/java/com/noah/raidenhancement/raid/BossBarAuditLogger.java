@@ -1,25 +1,23 @@
 package com.noah.raidenhancement.raid;
 
 /**
- * 0.9.1.3 BossBar module boundary audit helper.
+ * 0.9.1.3.1 BossBar audit throttle helper.
  *
- * This class is deliberately diagnostic-only. It names the desired BossBar
- * module boundaries without moving live state machines or changing the tested
- * 0.9.1.0 visual behavior. The current runtime path still lives in
- * {@link RaidIndependentBossbarManager}; this helper only adds consistent audit
- * fields so future extraction can be planned safely.
+ * Diagnostic-only hotfix. It preserves the tested 0.9.1.3 BossBar module
+ * boundaries and runtime behavior while reducing repeated audit output.
  */
 public final class BossBarAuditLogger {
-    public static final String STAGE = "0.9.1.3-bossbar-module-boundary-alpha";
-    public static final String AUDIT_MODE = "boundary-only-no-gameplay-behavior-change";
+    public static final String BOUNDARY_STAGE = "0.9.1.3-bossbar-module-boundary-alpha";
+    public static final String STAGE = "0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha";
+    public static final String AUDIT_MODE = "diagnostic-throttle-no-gameplay-behavior-change";
 
     private BossBarAuditLogger() {
     }
 
+    /** Full declaration. Emit only on BossBar creation / boundary declaration. */
     public static String commonBoundaryFields(String sourceModule) {
-        return " bossBarBoundaryStage=" + STAGE
-                + " bossBarAuditMode=" + AUDIT_MODE
-                + " sourceModule=" + safe(sourceModule)
+        return compactBoundaryFields(sourceModule)
+                + " bossBarBoundaryStage=" + BOUNDARY_STAGE
                 + " bossBarBehaviorUnchanged=true"
                 + " bossBarProgressAlgorithmChanged=false"
                 + " waveChangeChanged=false"
@@ -34,15 +32,32 @@ public final class BossBarAuditLogger {
                 + " bossBarCleanupBoundary=same-dimension-completed-stopped-cleanup-only"
                 + " bossBarVanillaSuppressBoundary=hide-vanilla-and-victory-rebind-guard"
                 + " bossBarAuditLoggerBoundary=diagnostic-only-no-state-mutation"
-                + " victoryAttachGuardBehaviorChanged=false";
+                + " victoryAttachGuardBehaviorChanged=false"
+                + " boundaryDeclarationRepeated=false";
+    }
+
+    /** Compact fields for recurring runtime events. */
+    public static String compactBoundaryFields(String sourceModule) {
+        return " bossBarAuditThrottleStage=" + STAGE
+                + " bossBarAuditMode=" + AUDIT_MODE
+                + " sourceModule=" + safe(sourceModule)
+                + " bossBarAuditThrottleActive=true"
+                + " bossBarRuntimeBehaviorChanged=false"
+                + " playerAuditPayload=name-and-uuid-only";
     }
 
     public static String boundarySummary() {
         return "BossBarDisplayManager(display-only);"
                 + "BossBarCleanupController(same-dimension-cleanup);"
                 + "BossBarVanillaSuppressor(vanilla-hide-and-victory-guard);"
-                + "BossBarAuditLogger(diagnostic-only);"
+                + "BossBarAuditLogger(throttled-diagnostic-only);"
                 + "VictoryBarAttachGuard(behavior-retained)";
+    }
+
+    public static String throttlePolicySummary() {
+        return "hide-vanilla:first-visible-failure-debounced-state-change-or-200tick-summary;"
+                + "boundary:full-on-create-compact-after;"
+                + "player:name-and-uuid-only";
     }
 
     private static String safe(String text) {

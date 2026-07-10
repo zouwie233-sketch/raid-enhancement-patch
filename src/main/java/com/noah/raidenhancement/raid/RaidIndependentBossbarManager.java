@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 0.9.1.3: BossBar module boundary audit presenter.
+ * 0.9.1.3.1: BossBar audit throttle hotfix presenter.
  *
  * The previous UI path fought vanilla Raid's own ServerBossEvent#setName calls.
  * That reduced but could not eliminate title flicker. This manager creates one
@@ -56,6 +56,8 @@ public final class RaidIndependentBossbarManager {
     private static final long VICTORY_ATTACH_GUARD_MIN_TICKS = 200L;
     private static final long VICTORY_ATTACH_GUARD_STABLE_ZERO_TICKS = 300L;
     private static final long CLIENT_REATTACH_INTERVAL_TICKS = 20L;
+    private static final long HIDE_VANILLA_AUDIT_SUMMARY_INTERVAL_TICKS = 200L;
+    private static final long HIDE_VANILLA_STATE_CHANGE_MIN_INTERVAL_TICKS = 20L;
     private static final double PLAYER_RADIUS_SQ = 128.0D * 128.0D;
 
     private RaidIndependentBossbarManager() {
@@ -69,7 +71,7 @@ public final class RaidIndependentBossbarManager {
             long gameTime = gameTime(serverLevel);
             if (!announced) {
                 announced = true;
-                System.out.println("[Raid Enhancement Patch] 0.9.1.3 BossBar module boundary audit stage is active. The mod-owned [REP] BossBar path keeps the tested 0.9.1.0 behavior, 0.9.1.2 Key audit fields, dimension-safe cleanup, and same-dimension VictoryBarAttachGuard. This stage adds diagnostic-only BossBar boundary fields and does not change progress math, waveChange, baselineReset, settlement keys, key formats, rewards, raid waves or VillageFavor.");
+                System.out.println("[Raid Enhancement Patch] 0.9.1.3.1 BossBar audit throttle hotfix stage is active. The mod-owned [REP] BossBar path keeps the tested 0.9.1.0 behavior, 0.9.1.2 Key audit fields, dimension-safe cleanup, and same-dimension VictoryBarAttachGuard. This stage throttles repeated BossBar audit output and shortens player identity payloads without changing progress math, waveChange, baselineReset, settlement keys, key formats, rewards, raid waves or VillageFavor.");
             }
             List<RaidEncounterSnapshot> snapshots = RaidEncounterAuthority.snapshots();
             Set<String> activeKeys = new HashSet<>();
@@ -720,8 +722,10 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(snapshot == null ? null : snapshot.key());
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.3-bossbar-module-boundary-alpha"
-                + BossBarAuditLogger.commonBoundaryFields("BossBarAuthorityAudit")
+                + " version=0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha"
+                + ("created".equals(phase)
+                        ? BossBarAuditLogger.commonBoundaryFields("BossBarAuthorityAudit")
+                        : BossBarAuditLogger.compactBoundaryFields("BossBarAuthorityAudit"))
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(snapshot == null ? null : snapshot.key())
@@ -760,8 +764,8 @@ public final class RaidIndependentBossbarManager {
         }
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarAuthorityAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.3-bossbar-module-boundary-alpha"
-                + BossBarAuditLogger.commonBoundaryFields("BossBarPlayerBindingAudit")
+                + " version=0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha"
+                + BossBarAuditLogger.compactBoundaryFields("BossBarPlayerBindingAudit")
                 + " playerKey=" + safeText(id)
                 + " player=" + safeText(playerDisplay(player))
                 + " success=" + success
@@ -947,15 +951,19 @@ public final class RaidIndependentBossbarManager {
         if (player == null) {
             return "null";
         }
-        Object name = invokeNoArgValue(player, "getGameProfile");
-        if (name != null) {
-            return String.valueOf(name);
+        Object profile = invokeNoArgValue(player, "getGameProfile");
+        Object profileName = invokeNoArgValue(profile, "getName");
+        Object uuid = invokeNoArgValue(player, "getUUID");
+        if (profileName != null) {
+            return String.valueOf(profileName) + (uuid == null ? "" : "/" + uuid);
         }
-        name = invokeNoArgValue(player, "getName");
+        Object name = invokeNoArgValue(player, "getName");
         if (name != null) {
-            return String.valueOf(name);
+            return String.valueOf(name) + (uuid == null ? "" : "/" + uuid);
         }
-        return player.getClass().getName() + "@" + System.identityHashCode(player);
+        return uuid == null
+                ? player.getClass().getName() + "@" + System.identityHashCode(player)
+                : String.valueOf(uuid);
     }
 
     private static String safeText(String value) {
@@ -1239,8 +1247,8 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = guard == null ? vanillaBossEvent(key) : (guard.vanillaBossEvent != null ? guard.vanillaBossEvent : vanillaBossEvent(key));
         String line = "[Raid Enhancement Patch][KeyDiag][VictoryBarAttachGuard] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.3-bossbar-module-boundary-alpha"
-                + BossBarAuditLogger.commonBoundaryFields("VictoryBarAttachGuard")
+                + " version=0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha"
+                + BossBarAuditLogger.compactBoundaryFields("VictoryBarAttachGuard")
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(key)
@@ -1340,8 +1348,8 @@ public final class RaidIndependentBossbarManager {
         Object vanilla = vanillaBossEvent(key);
         String line = "[Raid Enhancement Patch][KeyDiag][BossBarCleanupAudit] "
                 + "phase=" + safeText(phase)
-                + " version=0.9.1.3-bossbar-module-boundary-alpha"
-                + BossBarAuditLogger.commonBoundaryFields("BossBarCleanupAudit")
+                + " version=0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha"
+                + BossBarAuditLogger.compactBoundaryFields("BossBarCleanupAudit")
                 + " dimensionId=" + safeText(snapshot == null ? null : snapshot.dimensionId())
                 + " center=" + (snapshot == null ? "null" : snapshot.centerX() + "," + snapshot.centerY() + "," + snapshot.centerZ())
                 + " snapshot.key=" + safeText(key)
@@ -1393,15 +1401,47 @@ public final class RaidIndependentBossbarManager {
             if (!hidden && !removed) {
                 invokeOneArg(bossEvent, "setVisible", boolean.class, false);
             }
-            logAuthority("hide-vanilla", null, snapshot, bar, gameTime, true,
-                    "vanillaIdentity=" + bossEventIdentity(bossEvent)
-                            + ",beforeVisible=" + beforeVisible
-                            + ",beforeProgress=" + progressText(beforeProgress)
-                            + ",beforePlayers=" + beforePlayers
-                            + ",setVisibleFalse=" + hidden
-                            + ",removeAllPlayers=" + removed
-                            + ",afterVisible=" + bossEventVisible(bossEvent)
-                            + ",afterPlayers=" + bossEventPlayerCount(bossEvent));
+            boolean afterVisible = bossEventVisible(bossEvent);
+            int afterPlayers = bossEventPlayerCount(bossEvent);
+            boolean firstAudit = bar.lastHideVanillaAuditGameTime < 0L;
+            boolean failure = afterVisible || afterPlayers > 0 || (!hidden && !removed);
+            boolean visibleReappeared = beforeVisible;
+            boolean observedStateChanged = beforeVisible != bar.lastHideVanillaBeforeVisible
+                    || beforePlayers != bar.lastHideVanillaBeforePlayers
+                    || afterVisible != bar.lastHideVanillaAfterVisible
+                    || afterPlayers != bar.lastHideVanillaAfterPlayers;
+            boolean debouncedStateChange = observedStateChanged
+                    && (bar.lastHideVanillaAuditGameTime < 0L
+                    || gameTime - bar.lastHideVanillaAuditGameTime >= HIDE_VANILLA_STATE_CHANGE_MIN_INTERVAL_TICKS);
+            boolean periodicSummary = bar.lastHideVanillaAuditGameTime < 0L
+                    || gameTime - bar.lastHideVanillaAuditGameTime >= HIDE_VANILLA_AUDIT_SUMMARY_INTERVAL_TICKS;
+            if (firstAudit || failure || visibleReappeared || debouncedStateChange || periodicSummary) {
+                String auditReason = firstAudit ? "first"
+                        : failure ? "failure"
+                        : visibleReappeared ? "visible-reappeared"
+                        : debouncedStateChange ? "debounced-state-change"
+                        : "periodic-summary";
+                logAuthority("hide-vanilla", null, snapshot, bar, gameTime, true,
+                        "vanillaIdentity=" + bossEventIdentity(bossEvent)
+                                + ",beforeVisible=" + beforeVisible
+                                + ",beforeProgress=" + progressText(beforeProgress)
+                                + ",beforePlayers=" + beforePlayers
+                                + ",setVisibleFalse=" + hidden
+                                + ",removeAllPlayers=" + removed
+                                + ",afterVisible=" + afterVisible
+                                + ",afterPlayers=" + afterPlayers
+                                + ",auditReason=" + auditReason
+                                + ",suppressedRepeatCount=" + bar.suppressedHideVanillaAuditCount
+                                + ",throttlePolicy=" + BossBarAuditLogger.throttlePolicySummary());
+                bar.lastHideVanillaAuditGameTime = gameTime;
+                bar.suppressedHideVanillaAuditCount = 0;
+            } else {
+                bar.suppressedHideVanillaAuditCount++;
+            }
+            bar.lastHideVanillaBeforeVisible = beforeVisible;
+            bar.lastHideVanillaBeforePlayers = beforePlayers;
+            bar.lastHideVanillaAfterVisible = afterVisible;
+            bar.lastHideVanillaAfterPlayers = afterPlayers;
         } catch (Throwable throwable) {
             if (!warnedVanillaHideFailure) {
                 warnedVanillaHideFailure = true;
@@ -1734,6 +1774,12 @@ public final class RaidIndependentBossbarManager {
         int lastNearbyScanCount = -1;
         long lastClientReattachGameTime;
         long lastAuthorityAuditGameTime = -1L;
+        long lastHideVanillaAuditGameTime = -1L;
+        boolean lastHideVanillaBeforeVisible;
+        int lastHideVanillaBeforePlayers = -1;
+        boolean lastHideVanillaAfterVisible;
+        int lastHideVanillaAfterPlayers = -1;
+        int suppressedHideVanillaAuditCount;
         long pendingPostWaveAuditGameTime = -1L;
         int pendingPostWaveAuditWave = -1;
         RaidEncounterSnapshot lastSnapshot;

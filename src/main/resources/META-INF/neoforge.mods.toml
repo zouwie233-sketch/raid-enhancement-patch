@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.1.3-bossbar-module-boundary-alpha"
+version="0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.1.3 preserves the tested 0.9.1.0 BossBar / settlementKey safety anchor and the 0.9.1.2 Key audit polish fields. This stage adds BossBar module boundary diagnostics for the existing [REP] independent bar, same-dimension cleanup, vanilla suppress, and VictoryBarAttachGuard paths. It is a behavior-unchanged architecture-governance build: it does not change BossBar progress math, waveChange, baselineReset, settlement keys, RaidInstanceKey, VillageKey, VillageFavor behavior, rewards, villager gifts, raid wave counts, RaidWaveAuthority, RaidWaveExpansionController, persistent data, key format normalization, or the wave-8 crash guard.
+Stage 0.9.1.3.1 preserves the tested 0.9.1.3 BossBar module boundaries and runtime behavior. This diagnostic-only hotfix throttles repeated hide-vanilla audit output, emits the full BossBar boundary declaration only on creation, uses compact fields for recurring events, and limits player-binding identity output to name and UUID. It does not change BossBar progress math, waveChange, baselineReset, cleanup execution, vanilla suppression execution, VictoryBarAttachGuard behavior, settlement keys, RaidInstanceKey, VillageKey, VillageFavor, rewards, villager gifts, raid wave counts, persistent data, key format normalization, or Mixin enablement.
 '''
 
 [[mixins]]

@@ -1,0 +1,70 @@
+0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha 测试清单
+
+测试前：
+1. 完全关闭游戏。
+2. 删除旧的 config/raid_enhancement_patch/key_diagnostics.log。
+3. 不要删除 key_diagnostics.properties 或其他配置文件。
+4. 换入 0.9.1.3.1 JAR。
+
+A. 基础版本与行为回归
+1. latest.log 是否显示 0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha。
+2. 玩家是否能看到 [REP] BossBar。
+3. 第一波击杀后 [REP] 是否下降。
+4. 第二波开始时 [REP] 是否一次回满。
+5. 第二波击杀后 [REP] 是否继续下降。
+6. 后续波次是否仍保持“开始回满、击杀下降”。
+7. 袭击完成后 [REP] 是否正常消失。
+8. 完成后是否不出现无 [REP] 的原版 victory 条。
+9. 是否无本 Mod 崩溃。
+
+B. 原有安全锚点
+10. 跨维度 cleanup 是否仍记录 skipped-different-dimension。
+11. 不同维度 tick 是否没有错误触发 inactive-detected。
+12. VictoryBarAttachGuard 是否仍出现 victory-bar-attach-blocked。
+13. 阻断后是否为 afterVisible=false、afterPlayers=0。
+14. settlementKeyMode=raidInstance 是否正常。
+15. 是否无 duplicate-blocked-by-history。
+16. 是否无 @raidInstance:fallback。
+17. 是否只有一次 accepted-before-rewards，且无重复奖励/重复结算。
+18. dimensionDuplicationAny=true 是否仍只作为技术债记录，keyFormatChange=false。
+
+C. 本版诊断优化重点
+19. 是否出现 bossBarAuditThrottleStage=0.9.1.3.1-bossbar-audit-throttle-hotfix-alpha。
+20. 是否出现 bossBarAuditThrottleActive=true。
+21. 是否出现 bossBarRuntimeBehaviorChanged=false。
+22. 是否出现 playerAuditPayload=name-and-uuid-only。
+23. 玩家绑定日志中是否不再出现 Property[name=textures、signature= 或整段 GameProfile 属性。
+24. hide-vanilla 日志是否出现 auditReason。
+25. hide-vanilla 周期/状态变化日志是否出现 suppressedRepeatCount。
+26. 是否出现 throttlePolicy=hide-vanilla:first-visible-failure-debounced-state-change-or-200tick-summary。
+27. 完整 BossBar 边界字段是否主要只在 phase=created 的声明记录中出现，而不是每 tick 重复。
+28. 同等约 5–6 分钟袭击测试中，hide-vanilla 行数是否显著低于 0.9.1.3 的 4185 行。
+29. 建议目标：hide-vanilla 少于 500 行；若超过 1000 行，判定节流不足并上传日志。
+30. key_diagnostics.log 文件体积是否显著小于 0.9.1.3 同等测试时约 9.5 MB。
+
+测试后上传：
+- latest.log
+- key_diagnostics.log
+
+快速回报模板：
+0.9.1.3.1 测试结果：
+1. latest.log 显示 0.9.1.3.1：待检查 / 是 / 否
+2. [REP] BossBar 可见：是 / 否
+3. 第一波击杀后下降：是 / 否
+4. 第二波开始一次回满：是 / 否
+5. 第二波击杀后继续下降：是 / 否
+6. 完成后 [REP] 正常消失：是 / 否
+7. 完成后无原版 victory 条：是 / 否
+8. 跨维度 cleanup 正常：待检查 / 是 / 否
+9. VictoryBarAttachGuard 正常：待检查 / 是 / 否
+10. settlementKeyMode=raidInstance 正常：待检查 / 是 / 否
+11. 无 duplicate-blocked-by-history：待检查 / 是 / 否
+12. 无 @raidInstance:fallback：待检查 / 是 / 否
+13. 无重复奖励/重复结算：待检查 / 是 / 否
+14. 无崩溃：是 / 否
+15. bossBarAuditThrottleStage 正常出现：待检查 / 是 / 否
+16. playerAuditPayload=name-and-uuid-only：待检查 / 是 / 否
+17. 玩家日志无 textures/signature：待检查 / 是 / 否
+18. hide-vanilla 出现 suppressedRepeatCount：待检查 / 是 / 否
+19. hide-vanilla 行数：待检查
+20. key_diagnostics.log 文件大小：待检查
