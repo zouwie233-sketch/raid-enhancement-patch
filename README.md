@@ -8,4 +8,4 @@ It does not change BossBar progress math, wave refill behavior, cleanup executio
 
 ## Current architecture-governance delivery
 
-`0.9.1.4-victory-settlement-boundary-audit-alpha` adds a diagnostic-only `RaidCompletionResult` projection at the existing accepted victory-settlement path. It preserves 0.9.1.3.1 runtime behavior and does not migrate duplicate guard, rewards, VillageFavor, cleanup, keys, waves, or persistence to the new record.
+`0.9.1.5-village-favor-gateway-audit-alpha` introduces `VillageFavorGateway` as the settlement-facing VillageFavor read/write boundary. Existing behavior remains delegated to `VillageFavorSystem`; the `RaidCompletionResult` overload is present for future migration but is not a runtime consumer in this version.

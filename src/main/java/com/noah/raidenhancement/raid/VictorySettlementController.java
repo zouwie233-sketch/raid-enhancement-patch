@@ -3,7 +3,7 @@ package com.noah.raidenhancement.raid;
 import com.noah.raidenhancement.compat.ComponentCompat;
 import com.noah.raidenhancement.compat.MobEffectCompat;
 import com.noah.raidenhancement.config.VictorySettlementConfig;
-import com.noah.raidenhancement.favor.VillageFavorSystem;
+import com.noah.raidenhancement.favor.VillageFavorGateway;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -142,7 +142,7 @@ public final class VictorySettlementController {
                 if (player == null || !player.isAlive()) {
                     continue;
                 }
-                int oldFavorLevel = VillageFavorSystem.favorLevelFor(level, dimensionId, centerX, centerY, centerZ, player.getUUID());
+                int oldFavorLevel = VillageFavorGateway.favorLevelFor(level, dimensionId, centerX, centerY, centerZ, player.getUUID());
                 double favorXpBonus = VictorySettlementConfig.FAVOR_XP_BONUS_ENABLED ? JsonRewardTable.favorXpBonus(oldFavorLevel) : 0.0D;
                 int xp = (int) Math.round(baseXp * JsonRewardTable.gradeMultiplier(tier) * (1.0D + favorXpBonus));
                 if (xp > 0) {
@@ -166,7 +166,7 @@ public final class VictorySettlementController {
                 // The old points map is kept only for legacy migration helpers and is no longer authoritative here.
                 rewardedPlayers++;
             }
-            VillageFavorSystem.recordRaidVictory(level, dimensionId, centerX, centerY, centerZ, eligiblePlayers, gameTime,
+            VillageFavorGateway.recordRaidVictory(level, dimensionId, centerX, centerY, centerZ, eligiblePlayers, gameTime,
                     effectiveOmen, difficultyName, extraWaveCompleted);
 
             if (VictorySettlementConfig.SHOW_CHAT_MESSAGES) {

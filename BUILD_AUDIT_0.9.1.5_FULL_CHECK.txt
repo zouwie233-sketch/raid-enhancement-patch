@@ -1,0 +1,27 @@
+FULL STATIC CHECK — 0.9.1.5-village-favor-gateway-audit-alpha
+
+[PASS] JAR archive integrity.
+[PASS] Manifest Implementation-Version is 0.9.1.5-village-favor-gateway-audit-alpha.
+[PASS] neoforge.mods.toml version is 0.9.1.5-village-favor-gateway-audit-alpha.
+[PASS] RaidEnhancementPatch.VERSION is compiled as 0.9.1.5-village-favor-gateway-audit-alpha.
+[PASS] Java class major version is 65 (Java 21) for all new/changed compiled classes.
+[PASS] VillageFavorGateway.class exists.
+[PASS] VillageFavorGatewayAudit.class exists.
+[PASS] VillageFavorGateway exposes legacy-compatible read/write descriptors.
+[PASS] VillageFavorGateway exposes a RaidCompletionResult overload for future migration.
+[PASS] VictorySettlementController invokes VillageFavorGateway.favorLevelFor.
+[PASS] VictorySettlementController invokes VillageFavorGateway.recordRaidVictory.
+[PASS] Reverse owner patch makes VictorySettlementController byte-identical to 0.9.1.4.
+[PASS] VillageFavorSystem.class is unchanged from 0.9.1.4.
+[PASS] RaidCompletionResult.class and VictorySettlementBoundaryAudit.class are unchanged from 0.9.1.4.
+[PASS] Static gateway marker test passed.
+[PASS] raidCompletionResultConsumerMigration=false marker present.
+[PASS] favorRulesChanged=false and favorValuesChanged=false markers present.
+[PASS] gatewayDelegatesToVillageFavorSystem=true marker present.
+[PASS] No net/minecraft, net/neoforged or org/slf4j compile stubs are packaged.
+[PASS] ServerBossEventRaidTitleMixin remains absent from enabled mixin list.
+[PASS] No JAR entries removed relative to 0.9.1.4.
+[PASS] Only two project classes were added.
+[PASS] Existing changed entries are limited to manifest, mods metadata, main version class, diagnostics class and controller owner-routing class.
+[WARN] Gradle clean build not completed: services.gradle.org DNS resolution failed.
+[WAIT] In-game one-raid regression and log verification.

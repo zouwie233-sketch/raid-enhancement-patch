@@ -26,7 +26,7 @@ import net.neoforged.fml.common.Mod;
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.4-victory-settlement-boundary-audit-alpha";
+    public static final String VERSION = "0.9.1.5-village-favor-gateway-audit-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -46,7 +46,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Keeps the tested 0.9.1.3.1 BossBar audit throttle and all existing gameplay behavior, then adds a diagnostic-only RaidCompletionResult projection at the existing victory settlement boundary. The projection is not an authoritative runtime source and does not change duplicate prevention, reward order, VillageFavor writes, cleanup, settlement keys, key formats, raid waves, persistent data, VictoryBarAttachGuard behavior or the ServerBossEventRaidTitleMixin disabled state.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Keeps the tested 0.9.1.4 victory settlement boundary and all existing gameplay behavior, then routes the existing settlement favor read/write calls through VillageFavorGateway. The gateway delegates unchanged to VillageFavorSystem, exposes a future RaidCompletionResult overload without enabling consumer migration, and does not change favor values, growth rules, rewards, gifts, cooldowns, persistence, keys, BossBar behavior, raid waves or the ServerBossEventRaidTitleMixin disabled state.");
     }
 
     /**

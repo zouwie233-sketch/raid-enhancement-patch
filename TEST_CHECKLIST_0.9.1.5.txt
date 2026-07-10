@@ -1,0 +1,75 @@
+0.9.1.5-village-favor-gateway-audit-alpha 测试清单
+
+测试前：
+1. 完全关闭游戏。
+2. 删除旧的 config/raid_enhancement_patch/key_diagnostics.log。
+3. 不删除任何 .properties、settlement history 或 VillageFavor 数据。
+4. 换入 0.9.1.5 JAR。
+5. 完整打赢一场袭击。
+
+A. 基础回归
+1. latest.log 是否显示 0.9.1.5-village-favor-gateway-audit-alpha。
+2. 玩家是否能看到 [REP] BossBar。
+3. 第一波击杀后 [REP] 是否下降。
+4. 第二波开始时 [REP] 是否一次回满。
+5. 第二波击杀后 [REP] 是否继续下降。
+6. 袭击完成后 [REP] 是否正常消失。
+7. 完成后是否不出现无 [REP] 的原版 victory 条。
+8. 是否无本 Mod 崩溃。
+
+B. 既有安全锚点
+9. 跨维度 cleanup 是否仍为 skipped-different-dimension。
+10. VictoryBarAttachGuard 是否仍能阻断原版 victory 条重新绑定。
+11. settlementKeyMode=raidInstance 是否正常。
+12. 是否无 duplicate-blocked-by-history / duplicate-blocked-by-raid-instance-history 异常。
+13. 是否无 @raidInstance:fallback。
+14. 是否只有一次 accepted-before-rewards。
+15. 是否无重复奖励、重复经验和重复 VillageFavor 写入。
+16. 0.9.1.4 的两个 victory-settlement-boundary 快照是否仍存在。
+17. dimensionDuplicationAny 是否仍只作为审计技术债，keyFormatChange=false。
+18. BossBar 日志节流是否仍有效，且无完整 textures/signature 载荷。
+
+C. 0.9.1.5 Gateway 边界
+19. startup 是否出现 villageFavorGatewayStage=0.9.1.5-village-favor-gateway-audit-alpha。
+20. 是否出现 villageFavorGatewayRuntimeEntryActive=true。
+21. 是否出现 gatewayDelegatesToVillageFavorSystem=true。
+22. 是否出现 raidCompletionResultOverloadAvailable=true。
+23. 是否出现 raidCompletionResultConsumerMigration=false。
+24. 是否出现 legacyArgumentsBridgeActive=true。
+25. 是否出现 favorRulesChanged=false、favorValuesChanged=false。
+26. 是否出现 favorPersistenceChanged=false、favorRecordFormatChanged=false。
+27. 是否出现 giftRulesChanged=false、cooldownRulesChanged=false。
+28. 是否出现 villageKeyChanged=false、settlementKeyChanged=false。
+29. 是否出现 category=[village-favor-gateway] gatewayPhase=read-favor-level-before-reward。
+30. 是否出现 gatewayPhase=before-delegate-legacy。
+31. 是否出现 gatewayPhase=after-delegate-legacy。
+32. before/after 两条是否显示 gatewayEntry=legacy-arguments、raidCompletionResultUsed=false。
+33. gatewayEligiblePlayerCount 是否与本次实际结算玩家数一致。
+34. 现有 favor-record 是否仍恰好出现一次 before-recordRaidVictory 和一次 after-recordRaidVictory（单人测试）。
+35. 日志顺序是否为 gateway before → favor-record before/after → gateway after。
+36. after-recordRaidVictory 中 favorLevel、victoryCount、highestOmenLevelWon、raidMeritScore 是否正常增长且没有跳两次。
+37. 是否没有出现 before-delegate-completion-result / after-delegate-completion-result（本版尚未迁移）。
+
+测试后上传：
+- latest.log
+- key_diagnostics.log
+
+快速回报模板：
+0.9.1.5 测试结果：
+1. latest.log 显示 0.9.1.5：待检查 / 是 / 否
+2. [REP] BossBar 可见：是 / 否
+3. 第一波击杀后下降：是 / 否
+4. 第二波开始一次回满：是 / 否
+5. 第二波击杀后继续下降：是 / 否
+6. 完成后 [REP] 消失：是 / 否
+7. 完成后无原版 victory 条：是 / 否
+8. 无崩溃：是 / 否
+9. 跨维度 cleanup 正常：待检查 / 是 / 否
+10. settlementKeyMode=raidInstance：待检查 / 是 / 否
+11. 无 fallback / 重复结算：待检查 / 是 / 否
+12. 0.9.1.4 completion snapshots 保留：待检查 / 是 / 否
+13. villageFavorGatewayStage 出现：待检查 / 是 / 否
+14. gateway before/after legacy 出现：待检查 / 是 / 否
+15. gatewayEligiblePlayerCount 正确：待检查 / 是 / 否
+16. favor-record 仍只写一次：待检查 / 是 / 否
+17. RaidCompletionResult consumer migration 仍为 false：待检查 / 是 / 否

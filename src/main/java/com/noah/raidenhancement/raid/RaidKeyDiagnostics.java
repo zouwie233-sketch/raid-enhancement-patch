@@ -1,6 +1,7 @@
 package com.noah.raidenhancement.raid;
 
 import com.noah.raidenhancement.config.KeyDiagnosticsConfig;
+import com.noah.raidenhancement.favor.VillageFavorGatewayAudit;
 import com.noah.raidenhancement.favor.VillageFavorRecord;
 import com.noah.raidenhancement.favor.VillageFavorState;
 import net.minecraft.server.level.ServerLevel;
@@ -53,6 +54,7 @@ public final class RaidKeyDiagnostics {
                 + " " + KeyDebugService.startupMarker()
                 + " " + KeyDebugService.boundarySummary()
                 + " " + VictorySettlementBoundaryAudit.startupMarker()
+                + " " + VillageFavorGatewayAudit.startupMarker()
                 + " note=diagnostic-only-no-gameplay-behavior-change.");
     }
 
@@ -179,6 +181,38 @@ public final class RaidKeyDiagnostics {
                         throwable.toString());
             }
         }
+    }
+
+    public static void logVillageFavorGateway(String phase,
+                                                     ServerLevel level,
+                                                     String dimensionId,
+                                                     int centerX,
+                                                     int centerY,
+                                                     int centerZ,
+                                                     UUID playerUuid,
+                                                     int eligiblePlayerCount,
+                                                     long gameTime,
+                                                     int omenLevel,
+                                                     boolean extraWaveCompleted,
+                                                     boolean completionResultInput,
+                                                     String gatewayEntry) {
+        if (!KeyDiagnosticsConfig.ENABLED || !KeyDiagnosticsConfig.LOG_FAVOR) {
+            return;
+        }
+        String favorRecordKey = playerUuid == null
+                ? "not-applicable"
+                : VillageFavorState.recordKey(dimensionId, centerX, centerY, centerZ, playerUuid);
+        emit("village-favor-gateway",
+                VillageFavorGatewayAudit.auditFields(phase, gatewayEntry, eligiblePlayerCount, completionResultInput)
+                        + " dimensionId=" + safe(dimensionId)
+                        + " center=" + center(centerX, centerY, centerZ)
+                        + " villageKey=" + villageKey(dimensionId, centerX, centerY, centerZ)
+                        + " player=" + (playerUuid == null ? "not-applicable" : playerUuid)
+                        + " favorRecordKey=" + safe(favorRecordKey)
+                        + " omenLevel=" + omenLevel
+                        + " extraWaveCompleted=" + extraWaveCompleted
+                        + " gameTime=" + gameTime
+                        + " levelDimension=" + dimensionId(level) + ".");
     }
 
     public static void logFavorRecord(String phase,

@@ -1,0 +1,38 @@
+BUILD AUDIT — 0.9.1.5-village-favor-gateway-audit-alpha
+
+Scope
+- Establish VillageFavorGateway as the settlement-facing favor read/write boundary.
+- Preserve all favor behavior through direct delegation to VillageFavorSystem.
+- Prepare, but do not activate, a RaidCompletionResult consumer overload.
+
+Runtime changes
+- Added VillageFavorGateway.class.
+- Added VillageFavorGatewayAudit.class.
+- RaidKeyDiagnostics.class now emits startup/gateway audit fields.
+- RaidEnhancementPatch.class version/startup description updated.
+- VictorySettlementController.class changed only by replacing the constant-pool call owner VillageFavorSystem -> VillageFavorGateway. Method descriptors and all other bytes are unchanged.
+
+Strong controller verification
+- Reversing the single owner-name replacement in the 0.9.1.5 controller class produces a byte-for-byte match with the game-tested 0.9.1.4 controller class.
+- Therefore no settlement bytecode instructions, branch targets, reward order, duplicate guard, cleanup logic or arguments were otherwise changed.
+
+Behavior protection
+- Favor formulas changed: false.
+- Favor values changed: false.
+- VillageFavorRecord format changed: false.
+- Persistence changed: false.
+- Gift/cooldown rules changed: false.
+- VillageKey/settlementKey changed: false.
+- Rewards/BossBar/waves changed: false.
+- RaidCompletionResult runtime consumer migration: false.
+
+Build method
+- Gradle wrapper attempt failed before build because services.gradle.org could not be resolved.
+- Java 21 local compilation was used for new/changed project classes.
+- 0.9.1.4 game-tested JAR was used as the binary base.
+- Compile-time stubs were not packaged.
+
+Status
+- Static verification passed.
+- In-game regression pending.
+- Alpha test candidate; not a Gradle-clean-build or stable release claim.
