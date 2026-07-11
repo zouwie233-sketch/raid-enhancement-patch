@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.1.5-village-favor-gateway-audit-alpha"
+version="0.9.1.6-config-audit-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.1.5 preserves the tested 0.9.1.4 victory-settlement boundary and existing gameplay behavior. It introduces VillageFavorGateway as the settlement-facing read/write boundary: VictorySettlementController now calls the gateway, while the gateway delegates unchanged to VillageFavorSystem. A RaidCompletionResult overload is available for future migration but is not used by the runtime settlement consumer in this version. Favor values, growth rules, gifts, cooldowns, persistence, keys, BossBar behavior, rewards, raid waves and Mixin enablement are unchanged.
+Stage 0.9.1.6 preserves the tested 0.9.1.5 VillageFavorGateway boundary and existing gameplay behavior. It adds a read-only configuration audit marker plus complete CSV and Markdown configuration audit reports. No configuration value, default, file, key, runtime consumer, favor rule, reward, gift, cooldown, persistence format, BossBar behavior, raid wave or Mixin enablement is changed. Loaded-but-unused entries are documented only and are not removed in this version.
 '''
 
 [[mixins]]

@@ -5,6 +5,7 @@ import com.noah.raidenhancement.config.BattleSupportConfig;
 import com.noah.raidenhancement.config.VictorySettlementConfig;
 import com.noah.raidenhancement.config.VillageFavorConfig;
 import com.noah.raidenhancement.config.KeyDiagnosticsConfig;
+import com.noah.raidenhancement.config.ConfigAuditService;
 import com.noah.raidenhancement.event.VillagerProtectionEvents;
 import com.noah.raidenhancement.event.BattleSupportEvents;
 import com.noah.raidenhancement.event.VillageFavorEvents;
@@ -26,7 +27,7 @@ import net.neoforged.fml.common.Mod;
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.5-village-favor-gateway-audit-alpha";
+    public static final String VERSION = "0.9.1.6-config-audit-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -35,6 +36,7 @@ public final class RaidEnhancementPatch {
         VictorySettlementConfig.loadOrCreate();
         VillageFavorConfig.loadOrCreate();
         KeyDiagnosticsConfig.loadOrCreate();
+        ConfigAuditService.logStartup();
         RaidKeyDiagnostics.logStartup(VERSION);
         RaidSessionManager.bootstrap();
         VillagerProtectionController.bootstrap();
@@ -46,7 +48,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Keeps the tested 0.9.1.4 victory settlement boundary and all existing gameplay behavior, then routes the existing settlement favor read/write calls through VillageFavorGateway. The gateway delegates unchanged to VillageFavorSystem, exposes a future RaidCompletionResult overload without enabling consumer migration, and does not change favor values, growth rules, rewards, gifts, cooldowns, persistence, keys, BossBar behavior, raid waves or the ServerBossEventRaidTitleMixin disabled state.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Preserves the tested 0.9.1.5 VillageFavorGateway boundary and all existing gameplay behavior. This version adds a read-only configuration audit marker and ships a complete source-level configuration table. It does not delete, rename, migrate, rewrite or change any configuration value, default, runtime consumer, favor rule, reward, gift, cooldown, persistence format, key, BossBar behavior, raid wave or Mixin enablement.");
     }
 
     /**

@@ -1,0 +1,56 @@
+0.9.1.6-config-audit-alpha — regression checklist
+
+PREP
+1. Close Minecraft.
+2. Remove the old Raid Enhancement Patch JAR.
+3. Install the Gradle-built or explicitly labeled 0.9.1.6 snapshot JAR.
+4. Delete only config/raid_enhancement_patch/key_diagnostics.log.
+5. Keep all properties, settlement history, VillageFavor and world data.
+
+STARTUP / CONFIG AUDIT
+1. latest.log loads 0.9.1.6-config-audit-alpha.
+2. latest.log contains [ConfigAudit].
+3. key_diagnostics.log startup contains configAuditStage=0.9.1.6-config-audit-alpha when diagnostics are enabled.
+4. configAuditReadOnly=true.
+5. auditedFieldCount=417.
+6. runtimeLoadedEntryCount=232.
+7. loadedWithoutRuntimeConsumerCount=9.
+8. configValuesChanged=false.
+9. configDefaultsChanged=false.
+10. configFilesDeleted=false.
+11. configKeysRenamed=false.
+12. configMigrationPerformed=false.
+13. runtimeConsumersChanged=false.
+14. rareGiftChanceMultiplierEffective=false.
+15. equalXpPerEligiblePlayerEffective=false.
+16. professionGiftConfigEffective=true.
+17. emeraldCapsEffective=true.
+18. giftCooldownConfigEffective=true.
+19. raidsEnhancedCompatConfigEffective=true.
+20. bossBarDiagnosticConfigEffective=true.
+21. logModeEnumImplemented=false.
+
+CORE RAID REGRESSION
+22. [REP] BossBar is visible.
+23. Wave 1 decreases after kills.
+24. Wave 2 refills once.
+25. Wave 2 decreases after kills.
+26. Later waves remain normal.
+27. [REP] disappears after completion.
+28. No unmarked vanilla victory bar remains.
+29. No crash.
+
+SETTLEMENT / GATEWAY / KEY
+30. settlementKeyMode=raidInstance.
+31. No @raidInstance:fallback.
+32. No duplicate-blocked-by-history anomaly.
+33. accepted-before-rewards occurs once.
+34. before/after recordRaidVictory each occur once.
+35. VillageFavorGateway read and before/after legacy delegation remain present.
+36. raidCompletionResultConsumerMigration=false.
+37. before-history-check and accepted-before-rewards completion snapshots remain present.
+38. skipped-different-dimension remains normal.
+
+UPLOAD
+- latest.log
+- config/raid_enhancement_patch/key_diagnostics.log

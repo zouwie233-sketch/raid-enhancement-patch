@@ -1,0 +1,46 @@
+0.9.1.6 full static check
+
+[PASS] VERSION
+- gradle.properties = 0.9.1.6-config-audit-alpha
+- RaidEnhancementPatch.VERSION = 0.9.1.6-config-audit-alpha
+- neoforge.mods.toml = 0.9.1.6-config-audit-alpha
+- snapshot manifest Implementation-Version = 0.9.1.6-config-audit-alpha
+
+[PASS] NEW BOUNDARY
+- ConfigAuditService exists.
+- latest.log marker is emitted through ConfigAuditService.logStartup().
+- key_diagnostics startup marker includes ConfigAuditService.startupMarker().
+
+[PASS] AUDIT CONTENT
+- CONFIG_AUDIT_0.9.1.6.csv contains 417 data rows plus header.
+- Six configuration classes audited.
+- 232 runtime-loaded entries identified.
+- 9 loaded-without-runtime-consumer entries identified.
+- rareGiftChanceMultiplierEffective=false marker present.
+- equalXpPerEligiblePlayerEffective=false marker present.
+
+[PASS] BEHAVIOR GUARDS
+- configValuesChanged=false
+- configDefaultsChanged=false
+- configFilesDeleted=false
+- configKeysRenamed=false
+- configMigrationPerformed=false
+- runtimeConsumersChanged=false
+- logModeEnumImplemented=false
+
+[PASS] JAR DIFF
+- Added runtime entry: ConfigAuditService.class only.
+- Existing changed project classes: RaidEnhancementPatch.class and RaidKeyDiagnostics.class only.
+- No base gameplay controller/config class replaced.
+- No external compile stub packaged.
+
+[PASS] MIXINS
+- ServerBossEventRaidTitleMixin absent from enabled mixin configuration.
+
+[PASS] JAVA
+- Changed/new classes use class major version 65 (Java 21).
+- ConfigAuditService marker unit smoke test passed.
+
+[PENDING]
+- Formal Gradle clean build in a network-enabled environment.
+- Complete in-game raid regression and log inspection.

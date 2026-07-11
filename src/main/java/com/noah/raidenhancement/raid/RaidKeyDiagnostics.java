@@ -1,6 +1,7 @@
 package com.noah.raidenhancement.raid;
 
 import com.noah.raidenhancement.config.KeyDiagnosticsConfig;
+import com.noah.raidenhancement.config.ConfigAuditService;
 import com.noah.raidenhancement.favor.VillageFavorGatewayAudit;
 import com.noah.raidenhancement.favor.VillageFavorRecord;
 import com.noah.raidenhancement.favor.VillageFavorState;
@@ -55,6 +56,7 @@ public final class RaidKeyDiagnostics {
                 + " " + KeyDebugService.boundarySummary()
                 + " " + VictorySettlementBoundaryAudit.startupMarker()
                 + " " + VillageFavorGatewayAudit.startupMarker()
+                + " " + ConfigAuditService.startupMarker()
                 + " note=diagnostic-only-no-gameplay-behavior-change.");
     }
 

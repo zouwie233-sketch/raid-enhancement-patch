@@ -1,0 +1,47 @@
+Raid Enhancement Patch 0.9.1.6 build audit
+Version: 0.9.1.6-config-audit-alpha
+
+SCOPE
+- Read-only configuration audit only.
+- Added ConfigAuditService startup marker.
+- Added complete 417-row CSV audit and focused Markdown summary.
+- No config value/default/file/key/runtime consumer intentionally changed.
+
+CONFIG AUDIT RESULTS
+- Audited fields: 417
+- Runtime-loaded entries: 232
+- Code constants: 185
+- Loaded entries without confirmed runtime consumer: 9
+- rareGiftChanceMultiplier: loaded, currently ineffective
+- equalXpPerEligiblePlayer: loaded, currently ineffective
+- Profession gift switches, emerald caps, gift cooldowns, Raids Enhanced compat and BossBar diagnostics: runtime consumers confirmed
+
+GRADLE STATUS
+- ./gradlew --offline clean build attempted.
+- Failed because Gradle 8.12 distribution could not be downloaded from services.gradle.org.
+- Error: java.net.UnknownHostException: services.gradle.org
+- No Gradle clean-build claim is made.
+
+SNAPSHOT METHOD
+- Binary baseline: 0.9.1.5-village-favor-gateway-audit-alpha JAR.
+- Java 21 local compilation of changed/new project classes.
+- Replaced project classes only; compile-time stubs excluded.
+- Updated manifest and neoforge.mods.toml.
+
+CHANGED / ADDED RUNTIME ENTRIES
+- Added: com/noah/raidenhancement/config/ConfigAuditService.class
+- Changed: com/noah/raidenhancement/RaidEnhancementPatch.class
+- Changed: com/noah/raidenhancement/raid/RaidKeyDiagnostics.class
+- Changed metadata: META-INF/MANIFEST.MF, META-INF/neoforge.mods.toml
+
+STATIC RESULT
+- Java class version 65 (Java 21): pass
+- JAR archive integrity: pass
+- No Minecraft/NeoForge/SLF4J stubs packaged: pass
+- ServerBossEventRaidTitleMixin not enabled: pass
+- Config audit marker test: pass
+- Game regression: pending
+
+CLASSIFICATION
+- Source ZIP: formal handoff
+- Snapshot JAR: test-only snapshot, not formal Gradle release

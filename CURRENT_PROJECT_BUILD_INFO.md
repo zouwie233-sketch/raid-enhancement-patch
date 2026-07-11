@@ -2,9 +2,9 @@
 
 Current line: 0.9.1.x architecture governance line
 
-Current delivery: `0.9.1.5-village-favor-gateway-audit-alpha`
+Current delivery: `0.9.1.6-config-audit-alpha`
 
-Baseline anchor: `0.9.1.0-victory-bar-attach-guard-alpha` passed BossBar / settlementKey regression candidate testing.
+Baseline anchor: `0.9.1.0-victory-bar-attach-guard-alpha`.
 
 Passed candidates before this delivery:
 
@@ -12,11 +12,9 @@ Passed candidates before this delivery:
 - 0.9.1.2 Key audit polish;
 - 0.9.1.3 BossBar module boundary;
 - 0.9.1.3.1 BossBar audit throttle;
-- 0.9.1.4 VictorySettlement boundary audit.
+- 0.9.1.4 VictorySettlement boundary audit;
+- 0.9.1.5 VillageFavorGateway audit (user Gradle build and game regression passed candidate).
 
-0.9.1.5 routes the existing settlement-facing VillageFavor read and write calls through `VillageFavorGateway`. The gateway delegates unchanged to `VillageFavorSystem`. A `RaidCompletionResult` overload is available but runtime consumer migration remains disabled pending game testing and later architecture approval.
+0.9.1.6 performs a read-only configuration inventory. It adds no configuration behavior changes. The full audit contains 417 rows, 232 runtime-loaded entries and 9 loaded entries without confirmed runtime consumers.
 
-
-## 0.9.1.5 source-first status
-
-`0.9.1.5-village-favor-gateway-audit-alpha` is delivered as a complete source package for external Gradle build. Local Java 21 boundary compilation/static checks passed, but no formal Gradle clean build is claimed.
+Formal handoff from this environment is source-first. A local snapshot JAR may be supplied for testing but is not a Gradle clean-build release artifact.
