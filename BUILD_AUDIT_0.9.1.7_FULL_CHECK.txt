@@ -1,0 +1,72 @@
+0.9.1.7 full static and incremental build check
+
+[PASS] PROJECT IDENTITY
+- project = Raid Enhancement Patch
+- modid = raid_enhancement_patch
+- source baseline = 0.9.1.6-config-audit-alpha
+- target version = 0.9.1.7-reflection-cache-hotfix-alpha
+- Minecraft = 1.21.1
+- NeoForge = 21.1.234
+- Java = 21
+
+[PASS] VERSION ALIGNMENT
+- gradle.properties = 0.9.1.7-reflection-cache-hotfix-alpha
+- RaidEnhancementPatch.VERSION = 0.9.1.7-reflection-cache-hotfix-alpha
+- neoforge.mods.toml = 0.9.1.7-reflection-cache-hotfix-alpha
+- JAR manifest Implementation-Version = 0.9.1.7-reflection-cache-hotfix-alpha
+
+[PASS] P0 HOTFIX BOUNDARY
+- CachedReflection added with positive and negative caching.
+- Golem rollback work is isolated per level and deduplicated per golem UUID.
+- Block checks use a fixed per-level budget with round-robin queue rotation.
+- Cleanup zones are coalesced and budgeted.
+- Restoration is delayed while the triggering golem intersects the target block.
+- MobEffect member/constructor discovery is cached.
+- Villager protection effects are refresh-throttled.
+- Health-clamp maintenance is idempotent within one game tick.
+- Extra-wave spawn-position logic was not changed.
+- BossBar, wave, settlement, reward, VillageFavor and key modules were not changed.
+
+[PASS] HOT-PATH REFLECTION SEARCH
+- GolemBlockRollbackGuard contains no Class.getMethods/getDeclaredMethods/getConstructors calls.
+- MobEffectCompat contains no Class.getMethods/getDeclaredMethods/getConstructors calls.
+- BattleSupportEvents and VillagerProtectionEvents LevelTick access uses CachedReflection.
+- Member discovery calls exist only in CachedReflection and are cached, including failures.
+
+[PASS] COMPILATION
+- Changed/new Java classes compiled with javac --release 21.
+- Changed class major version = 65.
+- Minecraft/NeoForge-facing descriptor smoke comparison passed for VillagerProtectionController and VillagerProtectionEvents.
+- LivingIncomingDamageEvent.getEntity descriptor remains LivingEntity.
+
+[PASS] LOCAL SMOKE TESTS
+- Reflection cache stable after warm-up.
+- Per-golem snapshot deduplication passed.
+- Collision-delayed restoration passed.
+- Restoration after golem leaves passed.
+- Stable tick path did not grow the method cache.
+- Mob effect refresh throttling passed.
+- Negative effect lookup cache passed.
+
+[PASS] JAR PACKAGING
+- Archive integrity test passed.
+- No net/minecraft, net/neoforged or org/slf4j compile stubs packaged.
+- Mixin configuration is byte-identical to the 0.9.1.6 baseline.
+- ServerBossEventRaidTitleMixin remains absent from the enabled Mixin list.
+
+[PASS] SOURCE PACKAGE REQUIREMENTS
+- Gradle Wrapper scripts present.
+- gradle/wrapper/gradle-wrapper.jar present.
+- build.gradle, settings.gradle, gradle.properties and src present.
+
+[LIMITATION]
+- Gradle clean build was not possible because this environment cannot resolve/download Gradle 8.12 or NeoForge dependencies.
+- The JAR is a Java 21 incremental binary-overlay alpha artifact based on the provided 0.9.1.6 binary baseline.
+- Minecraft runtime test and Spark comparison remain pending.
+
+[PENDING USER ACCEPTANCE]
+- Game startup and world load.
+- Golem escape/rollback behavior.
+- Villager protection behavior.
+- BossBar/wave/settlement/reward regression.
+- 60-second Spark comparison in the original problem scene.

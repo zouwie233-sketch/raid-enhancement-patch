@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.1.6-config-audit-alpha"
+version="0.9.1.7-reflection-cache-hotfix-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.1.6 preserves the tested 0.9.1.5 VillageFavorGateway boundary and existing gameplay behavior. It adds a read-only configuration audit marker plus complete CSV and Markdown configuration audit reports. No configuration value, default, file, key, runtime consumer, favor rule, reward, gift, cooldown, persistence format, BossBar behavior, raid wave or Mixin enablement is changed. Loaded-but-unused entries are documented only and are not removed in this version.
+Stage 0.9.1.7 is a P0 server-thread hotfix based directly on the 0.9.1.6 source. It caches compatibility reflection discovery, deduplicates and budgets golem rollback work, delays block restoration while a golem still occupies escape space, and reduces redundant villager protection maintenance. BossBar behavior, raid waves, settlement keys, rewards, VillageFavor, persistence formats, configuration defaults and Mixin enablement are unchanged. Unsafe extra-wave spawn positions remain a separate deferred fix.
 '''
 
 [[mixins]]

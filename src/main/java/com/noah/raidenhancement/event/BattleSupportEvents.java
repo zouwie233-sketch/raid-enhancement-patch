@@ -1,5 +1,6 @@
 package com.noah.raidenhancement.event;
 
+import com.noah.raidenhancement.compat.CachedReflection;
 import com.noah.raidenhancement.raid.BattleSupportController;
 import com.noah.raidenhancement.raid.MercenaryGolemController;
 import com.noah.raidenhancement.raid.GolemBlockRollbackGuard;
@@ -11,7 +12,6 @@ import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
-import java.lang.reflect.Method;
 
 /** Game-bus hooks for item-driven battle support. Uses reflection for NeoForge 21.1.x event accessor compatibility. */
 public final class BattleSupportEvents {
@@ -65,8 +65,7 @@ public final class BattleSupportEvents {
             return null;
         }
         try {
-            Method method = target.getClass().getMethod(methodName);
-            return method.invoke(target);
+            return CachedReflection.invoke(target, methodName);
         } catch (Throwable throwable) {
             if (!warnedAccessorFailure) {
                 warnedAccessorFailure = true;
@@ -81,8 +80,7 @@ public final class BattleSupportEvents {
             return;
         }
         try {
-            Method method = event.getClass().getMethod("setCanceled", boolean.class);
-            method.invoke(event, true);
+            CachedReflection.invoke(event, "setCanceled", true);
         } catch (Throwable throwable) {
             if (!warnedAccessorFailure) {
                 warnedAccessorFailure = true;

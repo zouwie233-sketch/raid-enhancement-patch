@@ -11,6 +11,7 @@ public final class ProtectedVillagerState {
     private long expiresAtGameTime;
     private final String source;
     private long lastEffectRefreshGameTime;
+    private long lastHealthClampMaintenanceGameTime = Long.MIN_VALUE;
     private float allowedHealth = -1.0F;
 
     public ProtectedVillagerState(UUID villagerUuid, String dimensionId, long protectedAtGameTime, long expiresAtGameTime, String source) {
@@ -48,6 +49,14 @@ public final class ProtectedVillagerState {
 
     public void markEffectRefreshed(long gameTime) {
         this.lastEffectRefreshGameTime = gameTime;
+    }
+
+    public boolean healthClampMaintainedAt(long gameTime) {
+        return this.lastHealthClampMaintenanceGameTime == gameTime;
+    }
+
+    public void markHealthClampMaintained(long gameTime) {
+        this.lastHealthClampMaintenanceGameTime = gameTime;
     }
 
     public void extendUntil(long expiresAtGameTime) {

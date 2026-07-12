@@ -12,6 +12,7 @@ import com.noah.raidenhancement.event.VillageFavorEvents;
 import com.noah.raidenhancement.event.RaidWaveExpansionEvents;
 import com.noah.raidenhancement.raid.RaidSessionManager;
 import com.noah.raidenhancement.raid.RaidKeyDiagnostics;
+import com.noah.raidenhancement.raid.GolemBlockRollbackGuard;
 import com.noah.raidenhancement.item.ModItems;
 import net.neoforged.bus.api.IEventBus;
 import com.noah.raidenhancement.villager.VillagerProtectionController;
@@ -27,7 +28,7 @@ import net.neoforged.fml.common.Mod;
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.6-config-audit-alpha";
+    public static final String VERSION = "0.9.1.7-reflection-cache-hotfix-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -48,7 +49,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Preserves the tested 0.9.1.5 VillageFavorGateway boundary and all existing gameplay behavior. This version adds a read-only configuration audit marker and ships a complete source-level configuration table. It does not delete, rename, migrate, rewrite or change any configuration value, default, runtime consumer, favor rule, reward, gift, cooldown, persistence format, key, BossBar behavior, raid wave or Mixin enablement.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". P0 server-thread hotfix based on the untested 0.9.1.6 source baseline. " + GolemBlockRollbackGuard.hotfixMarker() + ". Mob-effect compatibility member discovery is cached with negative results, villager protection effect refreshes are throttled, and duplicate same-tick health-clamp maintenance is suppressed. BossBar, raid wave counts, settlement keys, rewards, VillageFavor, persistence formats and Mixin enablement are unchanged.");
     }
 
     /**

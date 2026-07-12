@@ -1,20 +1,17 @@
 # Current Project Build Info
 
-Current line: 0.9.1.x architecture governance line
+Current stage: P0 runtime stabilization and foundational defect repair.
 
-Current delivery: `0.9.1.6-config-audit-alpha`
+Current delivery: `0.9.1.7-reflection-cache-hotfix-alpha`
 
-Baseline anchor: `0.9.1.0-victory-bar-attach-guard-alpha`.
+Direct source baseline: `0.9.1.6-config-audit-alpha`.
 
-Passed candidates before this delivery:
+Behavior comparison baseline: `0.9.1.5-village-favor-gateway-audit-alpha`.
 
-- 0.9.1.1 Key Service audit;
-- 0.9.1.2 Key audit polish;
-- 0.9.1.3 BossBar module boundary;
-- 0.9.1.3.1 BossBar audit throttle;
-- 0.9.1.4 VictorySettlement boundary audit;
-- 0.9.1.5 VillageFavorGateway audit (user Gradle build and game regression passed candidate).
+Emergency safety anchor: `0.9.1.0-victory-bar-attach-guard-alpha`.
 
-0.9.1.6 performs a read-only configuration inventory. It adds no configuration behavior changes. The full audit contains 417 rows, 232 runtime-loaded entries and 9 loaded entries without confirmed runtime consumers.
+0.9.1.6 had not begun its planned regression test, but the Spark problem scene was run with 0.9.1.6 installed. The 0.9.1.7 hotfix therefore branches directly from the complete 0.9.1.6 source.
 
-Formal handoff from this environment is source-first. A local snapshot JAR may be supplied for testing but is not a Gradle clean-build release artifact.
+0.9.1.7 addresses repeated reflection discovery, unbounded rollback work amplification, duplicate golem snapshots, collision-unsafe restoration and redundant villager protection maintenance. It does not fix the separate unsafe extra-wave spawn-position design defect.
+
+The supplied source remains independently Gradle-buildable with the included Wrapper when network dependencies are available. The local JAR is a Java 21 binary-overlay alpha artifact because this environment cannot download Gradle/NeoForge dependencies.

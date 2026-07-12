@@ -1,5 +1,6 @@
 package com.noah.raidenhancement.event;
 
+import com.noah.raidenhancement.compat.CachedReflection;
 import com.noah.raidenhancement.config.RaidEnhancementConfig;
 import com.noah.raidenhancement.villager.VillagerProtectionController;
 import com.noah.raidenhancement.raid.VillageSecurityController;
@@ -15,7 +16,6 @@ import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
-import java.lang.reflect.Method;
 
 /** Game-bus listeners for stage 0.3.9 villager protection regression-fix. */
 public final class VillagerProtectionEvents {
@@ -95,8 +95,7 @@ public final class VillagerProtectionEvents {
             return null;
         }
         try {
-            Method method = target.getClass().getMethod(methodName);
-            return method.invoke(target);
+            return CachedReflection.invoke(target, methodName);
         } catch (Throwable throwable) {
             if (!warnedAccessorFailure) {
                 warnedAccessorFailure = true;

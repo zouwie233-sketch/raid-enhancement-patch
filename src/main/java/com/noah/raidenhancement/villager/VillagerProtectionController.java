@@ -6,7 +6,6 @@ import com.noah.raidenhancement.compat.MobEffectCompat;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.npc.Villager;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -71,13 +70,20 @@ public final class VillagerProtectionController {
         long expires = now + Math.max(20L, durationTicks);
         String dimensionId = serverLevel.dimension().location().toString();
         ProtectedVillagerState existing = PROTECTED_VILLAGERS.get(villager.getUUID());
-        if (existing != null && existing.dimensionId().equals(dimensionId)) {
+        boolean newlyProtected = existing == null || !existing.dimensionId().equals(dimensionId);
+        ProtectedVillagerState state;
+        if (!newlyProtected) {
             existing.extendUntil(expires);
+            state = existing;
         } else {
-            PROTECTED_VILLAGERS.put(villager.getUUID(), new ProtectedVillagerState(villager.getUUID(), dimensionId, now, expires, source));
+            state = new ProtectedVillagerState(villager.getUUID(), dimensionId, now, expires, source);
+            PROTECTED_VILLAGERS.put(villager.getUUID(), state);
         }
-        if (RaidEnhancementConfig.PROTECTED_VILLAGER_EFFECTS_ENABLED) {
+        if (RaidEnhancementConfig.PROTECTED_VILLAGER_EFFECTS_ENABLED
+                && (newlyProtected || now - state.lastEffectRefreshGameTime()
+                >= RaidEnhancementConfig.VILLAGER_PROTECTION_REFRESH_INTERVAL_TICKS)) {
             applyProtectionEffects(villager);
+            state.markEffectRefreshed(now);
         }
         return true;
     }
@@ -109,10 +115,10 @@ public final class VillagerProtectionController {
         if (state == null) {
             return false;
         }
+        long gameTime = ((ServerLevel) villager.level()).getGameTime();
         float current = currentHealth(villager);
         state.enableHealthClamp(current);
-        removeForbiddenHealingEffects(villager);
-        return enforceHealthClamp(villager, state);
+        return maintainHealthClamp(villager, state, gameTime);
     }
 
     public static synchronized boolean enforceVillageSecurityHealthClamp(Villager villager) {
@@ -120,11 +126,10 @@ public final class VillagerProtectionController {
             return false;
         }
         ProtectedVillagerState state = PROTECTED_VILLAGERS.get(villager.getUUID());
-        if (state == null || !state.hasHealthClamp()) {
+        if (state == null || !state.hasHealthClamp() || !(villager.level() instanceof ServerLevel serverLevel)) {
             return false;
         }
-        removeForbiddenHealingEffects(villager);
-        return enforceHealthClamp(villager, state);
+        return maintainHealthClamp(villager, state, serverLevel.getGameTime());
     }
 
     public static synchronized void updateVillageSecurityAllowedHealth(Villager villager) {
@@ -192,8 +197,9 @@ public final class VillagerProtectionController {
             return;
         }
         int duration = RaidEnhancementConfig.PROTECTED_VILLAGER_EFFECT_DURATION_TICKS;
-        MobEffectCompat.addEffect(villager, MobEffectCompat.RESISTANCE_NAMES, duration,
-                RaidEnhancementConfig.PROTECTED_VILLAGER_RESISTANCE_AMPLIFIER);
+        int refreshThreshold = Math.max(20, duration - RaidEnhancementConfig.VILLAGER_PROTECTION_REFRESH_INTERVAL_TICKS);
+        MobEffectCompat.ensureEffect(villager, MobEffectCompat.RESISTANCE_NAMES, duration,
+                RaidEnhancementConfig.PROTECTED_VILLAGER_RESISTANCE_AMPLIFIER, refreshThreshold);
         if (RaidEnhancementConfig.VILLAGE_SECURITY_ENABLED
                 && RaidEnhancementConfig.VILLAGE_SECURITY_DISABLE_OLD_REGEN_ABSORPTION) {
             // Village-security phase 1 turns villager health into a raid resource.
@@ -202,12 +208,12 @@ public final class VillagerProtectionController {
             MobEffectCompat.removeEffect(villager, MobEffectCompat.REGENERATION_NAMES);
             MobEffectCompat.removeEffect(villager, MobEffectCompat.ABSORPTION_NAMES);
         } else {
-            MobEffectCompat.addEffect(villager, MobEffectCompat.REGENERATION_NAMES, duration,
-                    RaidEnhancementConfig.PROTECTED_VILLAGER_REGENERATION_AMPLIFIER);
-            MobEffectCompat.addEffect(villager, MobEffectCompat.ABSORPTION_NAMES, duration,
-                    RaidEnhancementConfig.PROTECTED_VILLAGER_ABSORPTION_AMPLIFIER);
+            MobEffectCompat.ensureEffect(villager, MobEffectCompat.REGENERATION_NAMES, duration,
+                    RaidEnhancementConfig.PROTECTED_VILLAGER_REGENERATION_AMPLIFIER, refreshThreshold);
+            MobEffectCompat.ensureEffect(villager, MobEffectCompat.ABSORPTION_NAMES, duration,
+                    RaidEnhancementConfig.PROTECTED_VILLAGER_ABSORPTION_AMPLIFIER, refreshThreshold);
         }
-        MobEffectCompat.addEffect(villager, MobEffectCompat.FIRE_RESISTANCE_NAMES, duration, 0);
+        MobEffectCompat.ensureEffect(villager, MobEffectCompat.FIRE_RESISTANCE_NAMES, duration, 0, refreshThreshold);
     }
 
     public static synchronized void removeProtectionEffects(Villager villager) {
@@ -241,11 +247,8 @@ public final class VillagerProtectionController {
                 }
                 continue;
             }
-            if (state.hasHealthClamp()) {
-                removeForbiddenHealingEffects(villager);
-                if (enforceHealthClamp(villager, state)) {
-                    touched++;
-                }
+            if (state.hasHealthClamp() && maintainHealthClamp(villager, state, now)) {
+                touched++;
             }
             if (RaidEnhancementConfig.PROTECTED_VILLAGER_EFFECTS_ENABLED
                     && now - state.lastEffectRefreshGameTime() >= RaidEnhancementConfig.VILLAGER_PROTECTION_REFRESH_INTERVAL_TICKS) {
@@ -326,27 +329,19 @@ public final class VillagerProtectionController {
         }
         MobEffectCompat.removeEffect(villager, MobEffectCompat.REGENERATION_NAMES);
         MobEffectCompat.removeEffect(villager, MobEffectCompat.ABSORPTION_NAMES);
-        removeEffectIfPresent(villager, "HEALTH_BOOST");
+        MobEffectCompat.removeEffect(villager, MobEffectCompat.HEALTH_BOOST_NAMES);
     }
 
-    private static void removeEffectIfPresent(Villager villager, String mobEffectFieldName) {
-        try {
-            Class<?> mobEffectsClass = Class.forName("net.minecraft.world.effect.MobEffects");
-            Object holder = mobEffectsClass.getField(mobEffectFieldName).get(null);
-            for (Method method : villager.getClass().getMethods()) {
-                if (!method.getName().equals("removeEffect") || method.getParameterCount() != 1) {
-                    continue;
-                }
-                Class<?> parameterType = method.getParameterTypes()[0];
-                if (!parameterType.isAssignableFrom(holder.getClass())) {
-                    continue;
-                }
-                method.invoke(villager, holder);
-                return;
-            }
-        } catch (Throwable ignored) {
-            // Optional best-effort compatibility path for modded healing effects.
+    private static boolean maintainHealthClamp(Villager villager, ProtectedVillagerState state, long gameTime) {
+        if (villager == null || state == null || !state.hasHealthClamp()) {
+            return false;
         }
+        if (state.healthClampMaintainedAt(gameTime)) {
+            return false;
+        }
+        state.markHealthClampMaintained(gameTime);
+        removeForbiddenHealingEffects(villager);
+        return enforceHealthClamp(villager, state);
     }
 
 }

@@ -1,0 +1,60 @@
+Raid Enhancement Patch 0.9.1.7 P0 test checklist
+
+A. Startup and artifact
+[ ] Game reaches title screen.
+[ ] Existing test world loads.
+[ ] latest.log reports 0.9.1.7-reflection-cache-hotfix-alpha.
+[ ] No Mixin application failure.
+[ ] No dedicated-server/client-class loading error.
+
+B. Performance baseline
+[ ] Reproduce the same or closest available 0.9.1.6 scene.
+[ ] Run /spark profiler start --timeout 60.
+[ ] GolemBlockRollbackGuard.findMethod is absent or near 0%.
+[ ] Class.getMethods is not a main server-thread hotspot.
+[ ] BattleSupportEvents.onLevelTickPost is below 2% in a comparable scene, or any variance is documented.
+[ ] MobEffectCompat method discovery is not repeatedly sampled.
+[ ] TPS stays near 20 and average MSPT stays below 50 ms.
+[ ] Biological movement and server interactions no longer stutter continuously.
+[ ] No new periodic spike or unbounded memory growth appears.
+
+C. Golem rollback behavior
+[ ] One golem in open ground behaves normally.
+[ ] Repeatedly hitting one golem does not create escalating lag.
+[ ] A partially embedded golem can create escape space.
+[ ] Blocks do not restore while the golem still occupies the escape space.
+[ ] Restorable blocks recover after the golem leaves.
+[ ] No break-restore-break infinite loop occurs.
+[ ] Multiple golems do not cause severe TPS collapse.
+[ ] Golem death/removal does not leave permanent active work.
+[ ] Switching dimensions does not restore blocks in the wrong dimension.
+[ ] Container, vault and machine block entities are not damaged during the test.
+
+D. Villager protection
+[ ] Protected villagers still reject prohibited damage.
+[ ] Resistance and fire resistance remain active.
+[ ] Village-security regeneration/absorption suppression remains effective.
+[ ] Health clamp still prevents unauthorized healing.
+[ ] Many protected villagers do not create a new reflection hotspot.
+[ ] Effects are removed correctly when protection is released.
+
+E. Raid regression
+[ ] BossBar is visible.
+[ ] BossBar decreases as raiders die.
+[ ] A new wave refills it once.
+[ ] BossBar disappears when the raid completes.
+[ ] Vanilla victory bar does not return.
+[ ] Wave count and extra-wave behavior are unchanged.
+[ ] Raid completes normally.
+[ ] Settlement happens once.
+[ ] Rewards and VillageFavor happen once.
+[ ] Cross-dimension cleanup remains safe.
+
+F. Persistence and multiplayer
+[ ] Save and re-enter world without crash.
+[ ] Restart server/world without stale hotfix work.
+[ ] Player disconnect/reconnect does not duplicate BossBars or rewards.
+[ ] Multiplayer behavior is checked, or marked not tested.
+[ ] Dedicated server is checked, or marked not tested.
+
+Important: unsafe extra-wave spawn positions are not fixed in this version. Record every raider spawned inside blocks for the next safe-spawn version.

@@ -3,16 +3,17 @@ package com.noah.raidenhancement.compat;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Compatibility bridge for Minecraft mob effects.
  *
- * The staged builds are compiled outside a full NeoForge Gradle workspace. Direct bytecode
- * references to MobEffects fields or MobEffectInstance constructors can therefore bake in
- * wrong descriptors. This bridge resolves those members reflectively at runtime and degrades
- * to no-op instead of crashing the server if a field name or descriptor differs.
+ * <p>Runtime descriptors remain reflection-based for optional/staged compatibility, but all
+ * class, field, constructor and method discovery is cached, including failed lookups. Normal
+ * effect maintenance therefore performs only cached member invocation and never scans methods
+ * or constructors on the server tick path.</p>
  */
 public final class MobEffectCompat {
     public static final String[] RESISTANCE_NAMES = {"DAMAGE_RESISTANCE", "RESISTANCE"};
@@ -21,8 +22,12 @@ public final class MobEffectCompat {
     public static final String[] FIRE_RESISTANCE_NAMES = {"FIRE_RESISTANCE"};
     public static final String[] GLOWING_NAMES = {"GLOWING"};
     public static final String[] HERO_OF_THE_VILLAGE_NAMES = {"HERO_OF_THE_VILLAGE"};
+    public static final String[] HEALTH_BOOST_NAMES = {"HEALTH_BOOST"};
 
-    private static final Map<String, Object> EFFECT_CACHE = new ConcurrentHashMap<>();
+    private static final String MOB_EFFECTS_CLASS = "net.minecraft.world.effect.MobEffects";
+    private static final String MOB_EFFECT_INSTANCE_CLASS = "net.minecraft.world.effect.MobEffectInstance";
+
+    private static final Map<String, Optional<Object>> EFFECT_CACHE = new ConcurrentHashMap<>();
     private static final Set<String> WARNED = ConcurrentHashMap.newKeySet();
 
     private MobEffectCompat() {
@@ -52,7 +57,7 @@ public final class MobEffectCompat {
                 warnOnce("missing-instance-ctor", "Unable to construct MobEffectInstance reflectively.");
                 return;
             }
-            Method addEffect = findCompatibleMethod(livingEntity.getClass(), "addEffect", instance.getClass());
+            Method addEffect = CachedReflection.findMethod(livingEntity.getClass(), "addEffect", instance);
             if (addEffect == null) {
                 warnOnce("missing-addEffect", "Unable to find LivingEntity.addEffect method reflectively.");
                 return;
@@ -61,6 +66,15 @@ public final class MobEffectCompat {
         } catch (Throwable throwable) {
             warnOnce("addEffect-" + effectNames[0], "Failed to apply mob effect " + effectNames[0] + ": " + throwable);
         }
+    }
+
+    public static void ensureEffect(Object livingEntity, String[] effectNames, int durationTicks, int amplifier,
+                                    int refreshWhenRemainingAtOrBelow) {
+        int threshold = Math.max(0, refreshWhenRemainingAtOrBelow);
+        if (remainingDuration(livingEntity, effectNames) > threshold) {
+            return;
+        }
+        addEffect(livingEntity, effectNames, durationTicks, amplifier, false, false);
     }
 
     public static void removeEffect(Object livingEntity, String[] effectNames) {
@@ -72,7 +86,7 @@ public final class MobEffectCompat {
             if (effect == null) {
                 return;
             }
-            Method removeEffect = findCompatibleMethod(livingEntity.getClass(), "removeEffect", effect.getClass());
+            Method removeEffect = CachedReflection.findMethod(livingEntity.getClass(), "removeEffect", effect);
             if (removeEffect == null) {
                 warnOnce("missing-removeEffect", "Unable to find LivingEntity.removeEffect method reflectively.");
                 return;
@@ -92,21 +106,18 @@ public final class MobEffectCompat {
             if (effect == null) {
                 return false;
             }
-            Method hasEffect = findCompatibleMethod(livingEntity.getClass(), "hasEffect", effect.getClass());
+            Method hasEffect = CachedReflection.findMethod(livingEntity.getClass(), "hasEffect", effect);
             if (hasEffect != null) {
                 Object result = hasEffect.invoke(livingEntity, effect);
                 return result instanceof Boolean bool && bool;
             }
-            Method getEffect = findCompatibleMethod(livingEntity.getClass(), "getEffect", effect.getClass());
-            if (getEffect != null) {
-                return getEffect.invoke(livingEntity, effect) != null;
-            }
+            Method getEffect = CachedReflection.findMethod(livingEntity.getClass(), "getEffect", effect);
+            return getEffect != null && getEffect.invoke(livingEntity, effect) != null;
         } catch (Throwable throwable) {
             warnOnce("hasEffect-" + effectNames[0], "Failed to check mob effect " + effectNames[0] + ": " + throwable);
+            return false;
         }
-        return false;
     }
-
 
     public static int remainingDuration(Object livingEntity, String[] effectNames) {
         if (livingEntity == null || effectNames == null || effectNames.length == 0) {
@@ -117,7 +128,7 @@ public final class MobEffectCompat {
             if (effect == null) {
                 return 0;
             }
-            Method getEffect = findCompatibleMethod(livingEntity.getClass(), "getEffect", effect.getClass());
+            Method getEffect = CachedReflection.findMethod(livingEntity.getClass(), "getEffect", effect);
             if (getEffect == null) {
                 return 0;
             }
@@ -125,7 +136,10 @@ public final class MobEffectCompat {
             if (instance == null) {
                 return 0;
             }
-            Method getDuration = instance.getClass().getMethod("getDuration");
+            Method getDuration = CachedReflection.findMethod(instance.getClass(), "getDuration");
+            if (getDuration == null) {
+                return 0;
+            }
             Object value = getDuration.invoke(instance);
             return value instanceof Number number ? Math.max(0, number.intValue()) : 0;
         } catch (Throwable throwable) {
@@ -143,93 +157,55 @@ public final class MobEffectCompat {
 
     private static Object resolveEffect(String[] names) {
         for (String name : names) {
-            Object cached = EFFECT_CACHE.get(name);
-            if (cached != null) {
-                return cached;
+            Optional<Object> cached = EFFECT_CACHE.computeIfAbsent(name, MobEffectCompat::resolveSingleEffect);
+            if (cached.isPresent()) {
+                return cached.get();
             }
-        }
-        try {
-            Class<?> mobEffectsClass = Class.forName("net.minecraft.world.effect.MobEffects");
-            for (String name : names) {
-                try {
-                    Object effect = mobEffectsClass.getField(name).get(null);
-                    if (effect != null) {
-                        EFFECT_CACHE.put(name, effect);
-                        return effect;
-                    }
-                } catch (NoSuchFieldException ignored) {
-                    // Try the next candidate name.
-                }
-            }
-        } catch (Throwable throwable) {
-            warnOnce("resolve-effects", "Unable to resolve MobEffects class reflectively: " + throwable);
         }
         return null;
     }
 
-    private static Object createMobEffectInstance(Object effect, int durationTicks, int amplifier, boolean visible, boolean showIcon) {
+    private static Optional<Object> resolveSingleEffect(String name) {
         try {
-            Class<?> instanceClass = Class.forName("net.minecraft.world.effect.MobEffectInstance");
+            Class<?> mobEffectsClass = CachedReflection.findClass(MOB_EFFECTS_CLASS);
+            if (mobEffectsClass == null) {
+                return Optional.empty();
+            }
+            java.lang.reflect.Field field = CachedReflection.findField(mobEffectsClass, name);
+            if (field == null) {
+                return Optional.empty();
+            }
+            return Optional.ofNullable(field.get(null));
+        } catch (Throwable throwable) {
+            warnOnce("resolve-effect-" + name, "Unable to resolve MobEffect " + name + ": " + throwable);
+            return Optional.empty();
+        }
+    }
+
+    private static Object createMobEffectInstance(Object effect, int durationTicks, int amplifier,
+                                                   boolean visible, boolean showIcon) {
+        try {
+            Class<?> instanceClass = CachedReflection.findClass(MOB_EFFECT_INSTANCE_CLASS);
+            if (instanceClass == null) {
+                return null;
+            }
             int duration = Math.max(1, durationTicks);
             int level = Math.max(0, amplifier);
-            for (Constructor<?> constructor : instanceClass.getConstructors()) {
-                Class<?>[] types = constructor.getParameterTypes();
-                if (types.length == 6
-                        && types[0].isAssignableFrom(effect.getClass())
-                        && types[1] == int.class
-                        && types[2] == int.class
-                        && types[3] == boolean.class
-                        && types[4] == boolean.class
-                        && types[5] == boolean.class) {
-                    return constructor.newInstance(effect, duration, level, false, visible, showIcon);
-                }
-            }
-            for (Constructor<?> constructor : instanceClass.getConstructors()) {
-                Class<?>[] types = constructor.getParameterTypes();
-                if (types.length == 5
-                        && types[0].isAssignableFrom(effect.getClass())
-                        && types[1] == int.class
-                        && types[2] == int.class
-                        && types[3] == boolean.class
-                        && types[4] == boolean.class) {
-                    return constructor.newInstance(effect, duration, level, false, visible);
-                }
-            }
-            for (Constructor<?> constructor : instanceClass.getConstructors()) {
-                Class<?>[] types = constructor.getParameterTypes();
-                if (types.length == 3
-                        && types[0].isAssignableFrom(effect.getClass())
-                        && types[1] == int.class
-                        && types[2] == int.class) {
-                    return constructor.newInstance(effect, duration, level);
-                }
-            }
-            for (Constructor<?> constructor : instanceClass.getConstructors()) {
-                Class<?>[] types = constructor.getParameterTypes();
-                if (types.length == 2
-                        && types[0].isAssignableFrom(effect.getClass())
-                        && types[1] == int.class) {
-                    return constructor.newInstance(effect, duration);
+
+            Object[][] candidates = {
+                    {effect, duration, level, false, visible, showIcon},
+                    {effect, duration, level, false, visible},
+                    {effect, duration, level},
+                    {effect, duration}
+            };
+            for (Object[] arguments : candidates) {
+                Constructor<?> constructor = CachedReflection.findConstructor(instanceClass, arguments);
+                if (constructor != null) {
+                    return constructor.newInstance(arguments);
                 }
             }
         } catch (Throwable throwable) {
             warnOnce("create-instance", "Unable to construct MobEffectInstance: " + throwable);
-        }
-        return null;
-    }
-
-    private static Method findCompatibleMethod(Class<?> startClass, String methodName, Class<?> argumentClass) {
-        Class<?> current = startClass;
-        while (current != null) {
-            for (Method method : current.getMethods()) {
-                Class<?>[] parameterTypes = method.getParameterTypes();
-                if (method.getName().equals(methodName)
-                        && parameterTypes.length == 1
-                        && parameterTypes[0].isAssignableFrom(argumentClass)) {
-                    return method;
-                }
-            }
-            current = current.getSuperclass();
         }
         return null;
     }

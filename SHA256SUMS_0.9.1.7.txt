@@ -1,0 +1,2 @@
+fc135a923442868256d1f5d3819cf36a8ac5916a56a73e3b18c3b2790c07528a  raid_enhancement_patch-0.9.1.7-reflection-cache-hotfix-alpha.jar
+# Source ZIP SHA-256 is distributed beside the ZIP because a ZIP cannot contain its own final hash.
