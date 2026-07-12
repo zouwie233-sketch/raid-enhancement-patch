@@ -1,6 +1,7 @@
 package com.noah.raidenhancement.raid;
 
 import com.noah.raidenhancement.config.RaidEnhancementConfig;
+import com.noah.raidenhancement.compat.CachedReflection;
 import com.noah.raidenhancement.compat.MobEffectCompat;
 import com.noah.raidenhancement.integration.RaidsEnhancedIds;
 import com.noah.raidenhancement.villager.ProtectedVillagerState;
@@ -91,6 +92,8 @@ public final class RaidExtraWaveController {
     private static boolean warnedTickFailure;
     private static boolean warnedCommandFailure;
     private static boolean warnedDirectSpawnFailure;
+    private static boolean warnedUnsafeSpawnFailure;
+    private static boolean warnedSpawnBudgetExhausted;
     private static boolean warnedProtectionFailure;
     private static boolean warnedScanFailure;
     private static boolean warnedFinalizeFailure;
@@ -2064,12 +2067,21 @@ public final class RaidExtraWaveController {
             return false;
         }
         try {
-            Object entity = createEntityFromId(RaidsEnhancedIds.RAID_BLIMP, level);
-            if (!(entity instanceof Entity)) {
+            Object created = createEntityFromId(RaidsEnhancedIds.RAID_BLIMP, level);
+            if (!(created instanceof Entity entity)) {
                 return false;
             }
             int skyY = Math.max(y + 12, motionBlockingHeight(level, x, z) + 25);
-            if (!setBlimpVec3Position(entity, x + 0.5D, skyY, z + 0.5D)) {
+            if (RaidEnhancementConfig.EXTRA_WAVE_SAFE_SPAWN_VALIDATION_ENABLED) {
+                SafeRaidSpawnResolver.Resolution resolution = SafeRaidSpawnResolver.resolveAir(level, entity, x, skyY, z);
+                if (!resolution.found()) {
+                    reportSafeSpawnFailure(resolution);
+                    return false;
+                }
+                if (!setBlimpVec3Position(entity, resolution.x(), resolution.y(), resolution.z())) {
+                    moveEntity(entity, resolution.x(), resolution.y(), resolution.z());
+                }
+            } else if (!setBlimpVec3Position(entity, x + 0.5D, skyY, z + 0.5D)) {
                 moveEntity(entity, x + 0.5D, skyY, z + 0.5D);
             }
             int raidWave = Math.max(1, Math.min(Math.max(1, logicalWave), Math.max(1, state.effectiveNativeWaves())));
@@ -2078,10 +2090,10 @@ public final class RaidExtraWaveController {
             invokeOptional(entity, "setCanJoinRaid", Boolean.TRUE);
             invokeOptional(entity, "setTicksOutsideRaid", 0);
             boolean added = addFreshEntity(level, entity);
-            addWaveMobIfPossible(state.nativeRaid, raidWave, entity, true);
             if (added) {
+                addWaveMobIfPossible(state.nativeRaid, raidWave, entity, true);
                 applySpecialRaiderGlowing(entity, state);
-                rememberKnownRaiderFromEntity(state, (Entity) entity, RaiderCategory.RAIDS_ENHANCED_SPECIAL,
+                rememberKnownRaiderFromEntity(state, entity, RaiderCategory.RAIDS_ENHANCED_SPECIAL,
                         logicalWave, level.getGameTime());
             }
             return added;
@@ -2095,8 +2107,11 @@ public final class RaidExtraWaveController {
     }
 
     private static Object createEntityFromId(String entityId, ServerLevel level) throws ReflectiveOperationException {
-        Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
-        Method byString = entityTypeClass.getMethod("byString", String.class);
+        Class<?> entityTypeClass = CachedReflection.findClass("net.minecraft.world.entity.EntityType");
+        Method byString = CachedReflection.findMethod(entityTypeClass, "byString", entityId);
+        if (byString == null) {
+            return null;
+        }
         Object optional = byString.invoke(null, entityId);
         Object entityType = null;
         if (optional instanceof Optional<?> opt && opt.isPresent()) {
@@ -2130,24 +2145,18 @@ public final class RaidExtraWaveController {
 
     private static boolean setBlimpVec3Position(Object entity, double x, double y, double z) {
         try {
-            Class<?> vec3Class = Class.forName("net.minecraft.world.phys.Vec3");
-            Constructor<?> constructor = vec3Class.getConstructor(double.class, double.class, double.class);
-            Object vec3 = constructor.newInstance(x, y, z);
-            for (Method method : entity.getClass().getMethods()) {
-                if (!method.getName().equals("setPos") || method.getParameterCount() != 1) {
-                    continue;
-                }
-                if (!method.getParameterTypes()[0].isAssignableFrom(vec3Class)) {
-                    continue;
-                }
-                method.setAccessible(true);
-                method.invoke(entity, vec3);
-                return true;
+            Class<?> vec3Class = CachedReflection.findClass("net.minecraft.world.phys.Vec3");
+            Object vec3 = CachedReflection.construct(vec3Class, x, y, z);
+            Method method = CachedReflection.findMethod(entity.getClass(), "setPos", vec3);
+            if (method == null) {
+                return false;
             }
+            method.invoke(entity, vec3);
+            return true;
         } catch (Throwable ignored) {
             // Fall back to Entity#setPos/moveTo.
+            return false;
         }
-        return false;
     }
 
     private static void addWaveMobIfPossible(Object raid, int logicalWave, Object entity, boolean flag) {
@@ -2423,12 +2432,15 @@ public final class RaidExtraWaveController {
 
     private static boolean summon(ServerLevel level, String entityId, int x, int y, int z,
                                   ExtraWaveState state, int logicalWave, RaiderCategory category) {
-        // 0.4.9: prefer direct reflective entity spawning. Command-based /summon was visible
-        // to players as server command feedback and spammed the chat during extra waves.
+        // 0.9.1.8: direct creation is also the authoritative safety gate because it lets
+        // the resolver inspect the concrete entity's real bounding box. When validation
+        // is enabled, an unsafe/over-budget result must not fall through to command summon
+        // at the original unchecked coordinates.
         if (spawnEntityDirect(level, entityId, x, y, z, state, logicalWave, category)) {
             return true;
         }
-        if (!RaidEnhancementConfig.EXTRA_WAVE_USE_COMMAND_SUMMON) {
+        if (RaidEnhancementConfig.EXTRA_WAVE_SAFE_SPAWN_VALIDATION_ENABLED
+                || !RaidEnhancementConfig.EXTRA_WAVE_USE_COMMAND_SUMMON) {
             return false;
         }
         return summonWithCommand(level, entityId, x, y, z);
@@ -2437,8 +2449,11 @@ public final class RaidExtraWaveController {
     private static boolean spawnEntityDirect(ServerLevel level, String entityId, int x, int y, int z,
                                              ExtraWaveState state, int logicalWave, RaiderCategory category) {
         try {
-            Class<?> entityTypeClass = Class.forName("net.minecraft.world.entity.EntityType");
-            Method byString = entityTypeClass.getMethod("byString", String.class);
+            Class<?> entityTypeClass = CachedReflection.findClass("net.minecraft.world.entity.EntityType");
+            Method byString = CachedReflection.findMethod(entityTypeClass, "byString", entityId);
+            if (byString == null) {
+                return false;
+            }
             Object optional = byString.invoke(null, entityId);
             Object entityType = null;
             if (optional instanceof Optional<?> opt && opt.isPresent()) {
@@ -2447,15 +2462,34 @@ public final class RaidExtraWaveController {
             if (entityType == null) {
                 return false;
             }
-            Object entity = createEntity(entityType, level);
-            if (!(entity instanceof Entity)) {
+            Object created = createEntity(entityType, level);
+            if (!(created instanceof Entity entity)) {
                 return false;
             }
-            moveEntity(entity, x + 0.5D, y, z + 0.5D);
-            Object blockPos = blockPosAt(x, y, z);
-            // 0.4.10: vanilla-raider entities created through EntityType#create do not
+
+            double resolvedX = x + 0.5D;
+            double resolvedY = y;
+            double resolvedZ = z + 0.5D;
+            if (RaidEnhancementConfig.EXTRA_WAVE_SAFE_SPAWN_VALIDATION_ENABLED) {
+                SafeRaidSpawnResolver.Resolution resolution = SafeRaidSpawnResolver.resolveGround(level, entity, x, y, z);
+                if (!resolution.found()) {
+                    reportSafeSpawnFailure(resolution);
+                    return false;
+                }
+                resolvedX = resolution.x();
+                resolvedY = resolution.y();
+                resolvedZ = resolution.z();
+            } else {
+                moveEntity(entity, resolvedX, resolvedY, resolvedZ);
+            }
+
+            int blockX = (int) Math.floor(resolvedX);
+            int blockY = (int) Math.floor(resolvedY);
+            int blockZ = (int) Math.floor(resolvedZ);
+            Object blockPos = blockPosAt(blockX, blockY, blockZ);
+            // Vanilla-raider entities created through EntityType#create do not
             // automatically receive spawn equipment or raid AI. Finalize and join
-            // the native Raid when possible, then apply a conservative weapon fallback.
+            // only after the final safe position is known.
             if (RaidEnhancementConfig.EXTRA_WAVE_FINALIZE_SPAWN) {
                 finalizeSpawnIfPossible(entity, level, blockPos);
             }
@@ -2473,7 +2507,7 @@ public final class RaidExtraWaveController {
                 RaiderCategory resolvedCategory = RaidsEnhancedIds.isSpecialRaiderId(entityId)
                         ? RaiderCategory.RAIDS_ENHANCED_SPECIAL
                         : category;
-                rememberKnownRaiderFromEntity(state, (Entity) entity, resolvedCategory, logicalWave, level.getGameTime());
+                rememberKnownRaiderFromEntity(state, entity, resolvedCategory, logicalWave, level.getGameTime());
                 if (resolvedCategory == RaiderCategory.RAIDS_ENHANCED_SPECIAL) {
                     applySpecialRaiderGlowing(entity, state);
                 }
@@ -2488,60 +2522,51 @@ public final class RaidExtraWaveController {
         }
     }
 
+    private static void reportSafeSpawnFailure(SafeRaidSpawnResolver.Resolution resolution) {
+        if (resolution == null) {
+            return;
+        }
+        if (resolution.status() == SafeRaidSpawnResolver.Status.TICK_BUDGET_EXHAUSTED) {
+            if (!warnedSpawnBudgetExhausted) {
+                warnedSpawnBudgetExhausted = true;
+                System.out.println("[Raid Enhancement Patch] Safe-spawn search reached its per-tick budget once; remaining patch-owned raiders will use the existing wave retry path instead of loading chunks or spawning inside blocks.");
+            }
+            return;
+        }
+        if (!warnedUnsafeSpawnFailure) {
+            warnedUnsafeSpawnFailure = true;
+            System.out.println("[Raid Enhancement Patch] No safe position was found for one patch-owned raid entity; the entity was skipped instead of being inserted into blocks or fluids.");
+        }
+    }
+
     private static Object createEntity(Object entityType, ServerLevel level) throws ReflectiveOperationException {
-        for (Method method : entityType.getClass().getMethods()) {
-            if (!method.getName().equals("create") || method.getParameterCount() != 1) {
-                continue;
-            }
-            Class<?> parameterType = method.getParameterTypes()[0];
-            if (!parameterType.isAssignableFrom(level.getClass())) {
-                continue;
-            }
-            method.setAccessible(true);
-            return method.invoke(entityType, level);
+        if (entityType == null || level == null) {
+            return null;
         }
-        for (Method method : entityType.getClass().getDeclaredMethods()) {
-            if (!method.getName().equals("create") || method.getParameterCount() != 1) {
-                continue;
-            }
-            Class<?> parameterType = method.getParameterTypes()[0];
-            if (!parameterType.isAssignableFrom(level.getClass())) {
-                continue;
-            }
-            method.setAccessible(true);
-            return method.invoke(entityType, level);
-        }
-        return null;
+        Method method = CachedReflection.findMethod(entityType.getClass(), "create", level);
+        return method == null ? null : method.invoke(entityType, level);
     }
 
     private static void moveEntity(Object entity, double x, double y, double z) throws ReflectiveOperationException {
-        try {
-            Method moveTo = entity.getClass().getMethod("moveTo", double.class, double.class, double.class, float.class, float.class);
-            moveTo.setAccessible(true);
+        Method moveTo = CachedReflection.findMethod(entity.getClass(), "moveTo", x, y, z, 0.0F, 0.0F);
+        if (moveTo != null) {
             moveTo.invoke(entity, x, y, z, 0.0F, 0.0F);
             return;
-        } catch (NoSuchMethodException ignored) {
-            // Try setPos below.
         }
-        Method setPos = entity.getClass().getMethod("setPos", double.class, double.class, double.class);
-        setPos.setAccessible(true);
+        Method setPos = CachedReflection.findMethod(entity.getClass(), "setPos", x, y, z);
+        if (setPos == null) {
+            throw new NoSuchMethodException(entity.getClass().getName() + ".moveTo/setPos");
+        }
         setPos.invoke(entity, x, y, z);
     }
 
     private static boolean addFreshEntity(ServerLevel level, Object entity) throws ReflectiveOperationException {
-        for (Method method : level.getClass().getMethods()) {
-            if (!method.getName().equals("addFreshEntity") || method.getParameterCount() != 1) {
-                continue;
-            }
-            Class<?> parameterType = method.getParameterTypes()[0];
-            if (!parameterType.isAssignableFrom(entity.getClass())) {
-                continue;
-            }
-            method.setAccessible(true);
-            Object result = method.invoke(level, entity);
-            return !(result instanceof Boolean bool) || bool;
+        Method method = CachedReflection.findMethod(level.getClass(), "addFreshEntity", entity);
+        if (method == null) {
+            return false;
         }
-        return false;
+        Object result = method.invoke(level, entity);
+        return !(result instanceof Boolean bool) || bool;
     }
 
 
@@ -3265,26 +3290,20 @@ public final class RaidExtraWaveController {
                 {Math.max(0, state.effectiveNativeWaves() - 1), 0},
                 {Math.max(0, state.effectiveNativeWaves() - 1), 1}
         };
-        for (Method method : state.nativeRaid.getClass().getDeclaredMethods()) {
-            if (!method.getName().equals("findRandomSpawnPos") || method.getParameterCount() != 2) {
-                continue;
-            }
-            Class<?>[] types = method.getParameterTypes();
-            if ((types[0] != int.class && types[0] != Integer.TYPE) || (types[1] != int.class && types[1] != Integer.TYPE)) {
-                continue;
-            }
-            try {
-                method.setAccessible(true);
-                for (int[] attempt : attempts) {
-                    Object result = method.invoke(state.nativeRaid, attempt[0], attempt[1]);
-                    int[] extracted = extractBlockPosFromOptional(result);
-                    if (extracted != null) {
-                        return extracted;
-                    }
+        Method method = CachedReflection.findMethod(state.nativeRaid.getClass(), "findRandomSpawnPos", attempts[0][0], attempts[0][1]);
+        if (method == null) {
+            return null;
+        }
+        try {
+            for (int[] attempt : attempts) {
+                Object result = method.invoke(state.nativeRaid, attempt[0], attempt[1]);
+                int[] extracted = extractBlockPosFromOptional(result);
+                if (extracted != null) {
+                    return extracted;
                 }
-            } catch (Throwable ignored) {
-                // Fall back to a deterministic concentrated anchor below.
             }
+        } catch (Throwable ignored) {
+            // Fall back to a deterministic concentrated anchor below.
         }
         return null;
     }
@@ -3300,29 +3319,20 @@ public final class RaidExtraWaveController {
                 Math.max(0, state.effectiveNativeWaves() - 1),
                 Math.max(0, state.effectiveNativeWaves())
         };
-        for (Method method : state.nativeRaid.getClass().getDeclaredMethods()) {
-            if (!method.getName().equals("findRandomSpawnPos") || method.getParameterCount() != 2) {
-                continue;
-            }
-            Class<?>[] types = method.getParameterTypes();
-            if ((types[0] != int.class && types[0] != Integer.TYPE) || (types[1] != int.class && types[1] != Integer.TYPE)) {
-                continue;
-            }
-            try {
-                method.setAccessible(true);
-                for (int waveAttempt : waveAttempts) {
-                    for (int attempt = 0; attempt < 8 && anchors.size() < desired; attempt++) {
-                        Object result = method.invoke(state.nativeRaid, waveAttempt, attempt);
-                        int[] extracted = extractBlockPosFromOptional(result);
-                        addAnchorIfDistinct(anchors, extracted, desired);
-                    }
+        Method method = CachedReflection.findMethod(state.nativeRaid.getClass(), "findRandomSpawnPos", waveAttempts[0], 0);
+        if (method == null) {
+            return anchors;
+        }
+        try {
+            for (int waveAttempt : waveAttempts) {
+                for (int attempt = 0; attempt < 8 && anchors.size() < desired; attempt++) {
+                    Object result = method.invoke(state.nativeRaid, waveAttempt, attempt);
+                    int[] extracted = extractBlockPosFromOptional(result);
+                    addAnchorIfDistinct(anchors, extracted, desired);
                 }
-            } catch (Throwable ignored) {
-                // Fall back to deterministic multi-anchor candidates below.
             }
-            if (anchors.size() >= desired) {
-                break;
-            }
+        } catch (Throwable ignored) {
+            // Fall back to deterministic multi-anchor candidates below.
         }
         return anchors;
     }

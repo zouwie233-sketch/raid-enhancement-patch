@@ -1,0 +1,52 @@
+Raid Enhancement Patch 0.9.1.8-safe-spawn-validation-alpha
+Full build/static audit
+
+VERSION CONSISTENCY
+- gradle.properties: PASS
+- RaidEnhancementPatch.VERSION: PASS
+- neoforge.mods.toml: PASS
+- JAR manifest Implementation-Version: PASS
+
+JAVA
+- Target release: Java 21
+- All project class major versions in JAR: 65
+- Changed-source Java compilation: PASS
+
+JAR CONTENT
+- SafeRaidSpawnResolver and nested classes present: PASS
+- No net/minecraft compile stubs packaged: PASS
+- No net/neoforged compile stubs packaged: PASS
+- ZIP/JAR integrity: PASS
+- Mixin configuration byte-identical to 0.9.1.7: PASS
+- Unrelated JAR entries unchanged: PASS
+
+SAFE-SPAWN STATIC CHECKS
+- Real entity bounding box used: PASS
+- Loaded-chunk gate: PASS
+- World-border gate: PASS
+- Build-height gate: PASS
+- Collision gate: PASS
+- Fluid/hazard gate for ground entities: PASS
+- Ground-support sampling: PASS
+- Air-space validation for blimp: PASS
+- Per-entity candidate budget: PASS
+- Per-world/per-tick global budget: PASS
+- No chunk-loading API introduced: PASS
+- No terrain-clearing API introduced: PASS
+- Command summon cannot bypass validation: PASS
+- SafeRaidSpawnResolver contains no reflection member scans: PASS
+- Native findRandomSpawnPos member discovery cached: PASS
+
+SMOKE TESTS
+- Open requested position accepted on first check: PASS
+- Blocked requested point moved to nearby safe position: PASS
+- Fully blocked scenario terminates through bounded failure/budget status: PASS
+
+BUILD LIMITATION
+- Gradle clean build: NOT RUN
+- Reason: offline container could not download Gradle 8.12 or NeoForge dependencies.
+- Artifact type: Java 21 incremental test JAR based on verified 0.9.1.7 binary baseline.
+
+GAME TEST
+- Not performed.
+- Stable status: NOT APPROVED.

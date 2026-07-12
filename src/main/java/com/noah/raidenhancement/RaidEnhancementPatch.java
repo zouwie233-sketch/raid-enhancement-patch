@@ -28,7 +28,7 @@ import net.neoforged.fml.common.Mod;
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.7-reflection-cache-hotfix-alpha";
+    public static final String VERSION = "0.9.1.8-safe-spawn-validation-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -49,7 +49,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". P0 server-thread hotfix based on the untested 0.9.1.6 source baseline. " + GolemBlockRollbackGuard.hotfixMarker() + ". Mob-effect compatibility member discovery is cached with negative results, villager protection effect refreshes are throttled, and duplicate same-tick health-clamp maintenance is suppressed. BossBar, raid wave counts, settlement keys, rewards, VillageFavor, persistence formats and Mixin enablement are unchanged.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Safe-spawn validation stage based on the 0.9.1.7 performance hotfix. Patch-owned raid entities now receive bounded, per-entity bounding-box validation with loaded-chunk, world-border, fluid, hazard and support checks before joining the world. Spawn-search work is capped per entity and per server tick. " + GolemBlockRollbackGuard.hotfixMarker() + ". BossBar, raid wave counts, settlement keys, rewards, VillageFavor, persistence formats and Mixin enablement are unchanged.");
     }
 
     /**

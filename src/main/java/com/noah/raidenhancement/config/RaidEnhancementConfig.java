@@ -277,6 +277,18 @@ public final class RaidEnhancementConfig {
     public static final int EXTRA_WAVE_CLUSTER_RADIUS = 4;
     public static final int EXTRA_WAVE_SPAWN_ANCHOR_RADIUS = 56;
 
+    // 0.9.1.8 safe-spawn validation. Every patch-owned raider is checked with its
+    // real bounding box immediately before world insertion. Both per-entity and
+    // per-tick budgets are hard caps so dense high-omen waves cannot turn safety
+    // searching into a new server-thread spike. Unsafe or unloaded candidates are
+    // skipped; the resolver never loads chunks and never clears terrain.
+    public static final boolean EXTRA_WAVE_SAFE_SPAWN_VALIDATION_ENABLED = true;
+    public static final int EXTRA_WAVE_SAFE_SPAWN_SEARCH_RADIUS = 12;
+    public static final int EXTRA_WAVE_SAFE_SPAWN_VERTICAL_PROBE = 2;
+    public static final int EXTRA_WAVE_SAFE_SPAWN_MAX_CHECKS_PER_ENTITY = 48;
+    public static final int EXTRA_WAVE_SAFE_SPAWN_MAX_CHECKS_PER_TICK = 2048;
+    public static final int EXTRA_WAVE_SAFE_AIR_CLEARANCE = 20;
+
     // Step 5 preview: only the custom extra waves use multi-spawn points.
     // Vanilla native waves 1-8 remain untouched. Each point is still a small
     // concentrated squad, and every raider still goes through finalizeSpawn + joinRaid.

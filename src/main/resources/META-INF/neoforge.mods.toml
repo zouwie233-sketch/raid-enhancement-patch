@@ -4,7 +4,7 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.1.7-reflection-cache-hotfix-alpha"
+version="0.9.1.8-safe-spawn-validation-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''

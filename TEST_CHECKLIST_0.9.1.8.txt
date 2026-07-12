@@ -1,0 +1,58 @@
+Raid Enhancement Patch 0.9.1.8-safe-spawn-validation-alpha
+User test checklist
+
+A. Installation and startup
+[ ] Back up the test world.
+[ ] Remove 0.9.1.7 and install only 0.9.1.8.
+[ ] Confirm the log shows 0.9.1.8-safe-spawn-validation-alpha.
+[ ] Confirm no Mixin or class-loading error occurs.
+
+B. Safe spawn — ordinary terrain
+[ ] Start a raid in an open plains village.
+[ ] Patch-owned main and side reinforcements appear normally.
+[ ] Raiders are standing on terrain rather than floating or suffocating.
+[ ] The expected wave still advances and ends.
+
+C. Safe spawn — buildings and difficult terrain
+[ ] Test near dense village houses and walls.
+[ ] Test near a hill, cliff or uneven terrain.
+[ ] Test near trees and leaf canopies.
+[ ] Observe large entities such as ravagers and the final-resort golem.
+[ ] No patch-owned raider is visibly inserted into a solid block.
+[ ] Unsafe requested points relocate to nearby loaded safe ground.
+[ ] The system does not break blocks to manufacture spawn space.
+[ ] The system does not load distant chunks to find a position.
+
+D. Raids Enhanced specials
+[ ] Ground specials use safe ground positions.
+[ ] Raid blimps spawn in clear air above terrain.
+[ ] A failed special spawn does not leave a ghost raid member.
+
+E. High-pressure test
+[ ] Test Hard difficulty with high omen and multiple side points.
+[ ] Observe the spawn moment for a new TPS/MSPT spike.
+[ ] No long freeze occurs when terrain is crowded.
+[ ] If no safe position exists, the log prints at most one safety warning rather than spamming.
+[ ] The raid does not become permanently stuck if one optional reinforcement is skipped.
+
+F. Regression
+[ ] BossBar appears, decreases and refills normally.
+[ ] No original victory bar returns.
+[ ] Wave count remains unchanged.
+[ ] Victory rewards occur once.
+[ ] VillageFavor occurs once.
+[ ] Villager protection remains functional.
+[ ] Golem block rollback remains smooth.
+[ ] Cross-dimension cleanup remains correct.
+
+G. Spark comparison
+Run: /spark profiler start --timeout 60
+[ ] SafeRaidSpawnResolver is not a sustained tick hotspot.
+[ ] Spawn-time work appears only around actual reinforcement spawning.
+[ ] Class.getMethods is not a major spawn-path hotspot.
+[ ] TPS remains near 20 and MSPT normally remains below 50 ms.
+
+Status after testing:
+[ ] User test failed
+[ ] Partially passed
+[ ] User test passed
