@@ -4,37 +4,16 @@ import com.noah.raidenhancement.compat.CachedReflection;
 import com.noah.raidenhancement.raid.BattleSupportController;
 import com.noah.raidenhancement.raid.MercenaryGolemController;
 import com.noah.raidenhancement.raid.GolemBlockRollbackGuard;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.AttackEntityEvent;
-import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 
 /** Game-bus hooks for item-driven battle support. Uses reflection for NeoForge 21.1.x event accessor compatibility. */
 public final class BattleSupportEvents {
-    private static boolean warnedTickFailure;
     private static boolean warnedAccessorFailure;
-
-    @SubscribeEvent
-    public void onLevelTickPost(LevelTickEvent.Post event) {
-        Object rawLevel = callNoArg(event, "getLevel");
-        if (!(rawLevel instanceof ServerLevel serverLevel)) {
-            return;
-        }
-        try {
-            BattleSupportController.tick(serverLevel);
-            MercenaryGolemController.tick(serverLevel);
-            GolemBlockRollbackGuard.tick(serverLevel);
-        } catch (Throwable throwable) {
-            if (!warnedTickFailure) {
-                warnedTickFailure = true;
-                System.out.println("[Raid Enhancement Patch] Battle support item tick failed once and was suppressed: " + throwable);
-            }
-        }
-    }
 
     @SubscribeEvent
     public void onPlayerAttackEntity(AttackEntityEvent event) {

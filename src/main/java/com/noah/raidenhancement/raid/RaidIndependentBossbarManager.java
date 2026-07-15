@@ -1,6 +1,7 @@
 package com.noah.raidenhancement.raid;
 
 import com.noah.raidenhancement.config.KeyDiagnosticsConfig;
+import com.noah.raidenhancement.raid.runtime.RaidRuntimeView;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -38,8 +39,6 @@ public final class RaidIndependentBossbarManager {
     private static final Map<Class<?>, Map<String, Method>> ONE_ARG_METHOD_CACHE = new IdentityHashMap<>();
     private static final Set<String> PLAYERS_SNAPSHOT = new HashSet<>();
 
-    private static Field statesField;
-    private static boolean statesFieldResolved;
     private static boolean warnedCreateFailure;
     private static boolean warnedTickFailure;
     private static boolean warnedVanillaHideFailure;
@@ -309,14 +308,8 @@ public final class RaidIndependentBossbarManager {
     }
 
     private static CountDiagnostics effectiveLiveRaiderCountDetailed(Object serverLevel, RaidEncounterSnapshot snapshot, String key, long gameTime) {
-        Object state = null;
-        Object nativeRaid = null;
-        try {
-            state = stateByKey(key);
-            nativeRaid = state == null ? null : readObject(state, "nativeRaid");
-        } catch (Throwable ignored) {
-            // Fall through to the next source.
-        }
+        RaidRuntimeView runtime = RaidExtraWaveController.runtimeView(key);
+        Object nativeRaid = runtime == null ? null : runtime.nativeRaidHandle();
 
         int nativeCount = countNativeRaiders(nativeRaid);
         if (nativeCount >= 0) {
@@ -331,13 +324,13 @@ public final class RaidIndependentBossbarManager {
         // Last-resort low-frequency local scan. This is intentionally throttled
         // per bar, not a full-world scan, and only used when the Raid object and
         // runtime session cannot provide a count.
-        if (state != null) {
+        if (runtime != null) {
             Integer scanned = throttledNearbyRaiderCount(serverLevel, key, snapshot, gameTime);
             if (scanned != null) {
                 return new CountDiagnostics(scanned, "nearbyScan", nativeCount, sessionCount, scanned);
             }
         }
-        return new CountDiagnostics(-1, state == null ? "unavailable:no-state" : "unavailable:no-count-source", nativeCount, sessionCount, -1);
+        return new CountDiagnostics(-1, runtime == null ? "unavailable:no-state" : "unavailable:no-count-source", nativeCount, sessionCount, -1);
     }
 
     private static int countNativeRaiders(Object nativeRaid) {
@@ -544,11 +537,11 @@ public final class RaidIndependentBossbarManager {
             return null;
         }
         try {
-            Object state = stateByKey(key);
-            if (state == null) {
+            RaidRuntimeView runtime = RaidExtraWaveController.runtimeView(key);
+            if (runtime == null) {
                 return null;
             }
-            Object nativeRaid = readObject(state, "nativeRaid");
+            Object nativeRaid = runtime.nativeRaidHandle();
             Object bossEvent = findServerBossEvent(nativeRaid);
             return readBossEventProgress(bossEvent);
         } catch (Throwable ignored) {
@@ -798,8 +791,8 @@ public final class RaidIndependentBossbarManager {
             return null;
         }
         try {
-            Object state = stateByKey(key);
-            Object nativeRaid = state == null ? null : readObject(state, "nativeRaid");
+            RaidRuntimeView runtime = RaidExtraWaveController.runtimeView(key);
+            Object nativeRaid = runtime == null ? null : runtime.nativeRaidHandle();
             return findServerBossEvent(nativeRaid);
         } catch (Throwable ignored) {
             return null;
@@ -1381,11 +1374,11 @@ public final class RaidIndependentBossbarManager {
             return;
         }
         try {
-            Object state = stateByKey(key);
-            if (state == null) {
+            RaidRuntimeView runtime = RaidExtraWaveController.runtimeView(key);
+            if (runtime == null) {
                 return;
             }
-            Object nativeRaid = readObject(state, "nativeRaid");
+            Object nativeRaid = runtime.nativeRaidHandle();
             Object bossEvent = findServerBossEvent(nativeRaid);
             if (bossEvent == null) {
                 return;
@@ -1464,28 +1457,6 @@ public final class RaidIndependentBossbarManager {
         }
         players.clear();
         invokeOneArg(bossEvent, "setVisible", boolean.class, false);
-    }
-
-    private static Object stateByKey(String key) throws ReflectiveOperationException {
-        Map<?, ?> states = states();
-        return states == null ? null : states.get(key);
-    }
-
-    private static Map<?, ?> states() throws ReflectiveOperationException {
-        if (!statesFieldResolved) {
-            statesFieldResolved = true;
-            Field field = RaidExtraWaveController.class.getDeclaredField("STATES");
-            field.setAccessible(true);
-            statesField = field;
-        }
-        if (statesField == null) {
-            return null;
-        }
-        Object value = statesField.get(null);
-        if (value instanceof Map<?, ?> map) {
-            return map;
-        }
-        return null;
     }
 
     private static Object findServerBossEvent(Object raid) {
@@ -1571,31 +1542,6 @@ public final class RaidIndependentBossbarManager {
             return String.valueOf(uuid);
         }
         return player.getClass().getName() + "@" + System.identityHashCode(player);
-    }
-
-    private static Object readObject(Object target, String fieldName) {
-        try {
-            Field field = findField(target.getClass(), fieldName);
-            if (field == null) {
-                return null;
-            }
-            field.setAccessible(true);
-            return field.get(target);
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private static Field findField(Class<?> type, String fieldName) {
-        Class<?> current = type;
-        while (current != null && current != Object.class) {
-            try {
-                return current.getDeclaredField(fieldName);
-            } catch (NoSuchFieldException ignored) {
-                current = current.getSuperclass();
-            }
-        }
-        return null;
     }
 
     private static Object component(String text) {

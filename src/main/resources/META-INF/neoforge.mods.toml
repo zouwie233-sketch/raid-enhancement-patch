@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.1.8-safe-spawn-validation-alpha"
+version="0.9.1.9-runtime-boundary-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.1.7 is a P0 server-thread hotfix based directly on the 0.9.1.6 source. It caches compatibility reflection discovery, deduplicates and budgets golem rollback work, delays block restoration while a golem still occupies escape space, and reduces redundant villager protection maintenance. BossBar behavior, raid waves, settlement keys, rewards, VillageFavor, persistence formats, configuration defaults and Mixin enablement are unchanged. Unsafe extra-wave spawn positions remain a separate deferred fix.
+Stage 0.9.1.9 is the first behavior-preserving runtime-boundary refactor based on the user-tested 0.9.1.8 safe-spawn alpha. It centralizes server-level tick orchestration and replaces cross-controller private-state reflection with immutable runtime views. Safe spawning, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor, persistence formats, configuration defaults and enabled Mixins are unchanged.
 '''
 
 [[mixins]]

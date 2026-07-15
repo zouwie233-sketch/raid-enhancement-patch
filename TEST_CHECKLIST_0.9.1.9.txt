@@ -1,0 +1,53 @@
+Raid Enhancement Patch 0.9.1.9 runtime-boundary regression checklist
+
+[BUILD]
+[ ] GitHub Actions runtime-boundary verification passes
+[ ] Gradle clean build passes on Java 21
+[ ] Built JAR reports 0.9.1.9-runtime-boundary-alpha
+[ ] JAR contains no Minecraft/NeoForge compile stubs
+
+[STARTUP]
+[ ] Dedicated server starts with Raids Enhanced 1.0.2 and fdlib
+[ ] Startup without optional Raids Enhanced fails closed only for optional compatibility
+[ ] No duplicate event-listener warnings
+[ ] No missing Mixin target warnings for the configured Mixins
+
+[TICK ORDER / DUPLICATION]
+[ ] Protected villagers are maintained at the previous cadence, not twice
+[ ] Raid wave discovery and extra-wave progression occur once per level tick
+[ ] Battle-support, mercenary and rollback controllers occur once per level tick
+[ ] Settlement and BossBar update after RaidExtraWaveController as in 0.9.1.8
+
+[RAID REGRESSION]
+[ ] Native waves 1-8 retain expected counts
+[ ] Extra waves 9-11 retain expected difficulty/omen plan
+[ ] Side reinforcements and Raids Enhanced specials do not duplicate
+[ ] Safe spawn validation still rejects walls, fluids and unsupported ground
+[ ] Failed safe-spawn searches retain the previous retry behavior
+[ ] Raid victory is not announced before the custom chain completes
+
+[BOSSBAR]
+[ ] One independent raid BossBar is visible
+[ ] Wave title and total-wave count match 0.9.1.8
+[ ] Progress does not refill within the same wave
+[ ] Vanilla victory BossBar does not reattach
+[ ] Leaving/re-entering the dimension does not leak or remove another dimension's bar
+
+[BATTLE SUPPORT]
+[ ] Each token finds the nearest same-dimension village-security session
+[ ] Strength, shield, speed, fire, insight and rally behavior match 0.9.1.8
+[ ] Mercenary token behavior and cooldown match 0.9.1.8
+[ ] No token is consumed when no valid session/target exists
+
+[SETTLEMENT / PERSISTENCE]
+[ ] XP, item rewards and Hero of the Village match 0.9.1.8
+[ ] Settlement duplicate guard still blocks only the same raid instance
+[ ] VillageFavor and profession gifts load and save unchanged
+[ ] Existing 0.9.1.8 Properties files load without migration or rewrite errors
+
+[PERFORMANCE]
+[ ] Compare 60-second Spark capture with 0.9.1.8 in the same raid scene
+[ ] No new allocation hotspot from RaidRuntimeView
+[ ] No duplicate controller tick entries
+
+Do not continue to SavedData or the full RaidRuntime state-machine migration until this checklist passes.

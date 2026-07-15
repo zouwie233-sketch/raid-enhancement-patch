@@ -2,6 +2,7 @@ package com.noah.raidenhancement.raid;
 
 import com.noah.raidenhancement.compat.MobEffectCompat;
 import com.noah.raidenhancement.config.RaidEnhancementConfig;
+import com.noah.raidenhancement.raid.runtime.VillageSecurityRuntimeView;
 import com.noah.raidenhancement.villager.VillagerProtectionController;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -208,6 +209,22 @@ public final class VillageSecurityController {
     };
 
     private VillageSecurityController() {
+    }
+
+    /**
+     * Exposes only the immutable session data needed by battle-support items.
+     * Session ownership and mutation remain private to this controller.
+     */
+    public static List<VillageSecurityRuntimeView> runtimeViews() {
+        List<VillageSecurityRuntimeView> views = new ArrayList<>(SESSIONS.size());
+        for (SecuritySession session : SESSIONS.values()) {
+            if (session == null) {
+                continue;
+            }
+            views.add(new VillageSecurityRuntimeView(session.raidKey, session.dimensionId,
+                    session.centerX, session.centerY, session.centerZ, session.securityGolemIds));
+        }
+        return List.copyOf(views);
     }
 
     public static void tick(ServerLevel level, String raidKey, String dimensionId,

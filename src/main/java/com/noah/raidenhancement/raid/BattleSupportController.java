@@ -3,12 +3,12 @@ package com.noah.raidenhancement.raid;
 import com.noah.raidenhancement.compat.MobEffectCompat;
 import com.noah.raidenhancement.config.BattleSupportConfig;
 import com.noah.raidenhancement.item.BattleSupportTokenItem;
+import com.noah.raidenhancement.raid.runtime.VillageSecurityRuntimeView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -23,8 +23,9 @@ import java.util.UUID;
 /**
  * Applies item-driven battlefield support to the already-managed village-security golems.
  *
- * This class deliberately reads the stable VillageSecurityController sessions via reflection instead of modifying the
- * extra-wave/HUD/raid-state code paths. It only looks up active security golem UUIDs and applies effects to those golems.
+ * This class reads immutable VillageSecurityController runtime views without modifying
+ * extra-wave, HUD or raid-state code paths. It only looks up active security golem UUIDs
+ * and applies effects to those golems.
  */
 public final class BattleSupportController {
     private static final String[] STRENGTH_NAMES = {"DAMAGE_BOOST", "STRENGTH"};
@@ -34,7 +35,6 @@ public final class BattleSupportController {
     private static final String[] ABSORPTION_NAMES = {"ABSORPTION"};
     private static final Map<UUID, ShieldRecord> SHIELD_RECORDS = new LinkedHashMap<>();
     private static final Map<String, InsightState> INSIGHT_STATES = new LinkedHashMap<>();
-    private static boolean warnedSessionAccess;
     private static boolean warnedAbsorptionAccess;
 
     private BattleSupportController() {
@@ -582,93 +582,38 @@ public final class BattleSupportController {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static ActiveSecuritySession findNearestSession(ServerLevel level, Player player, int radius) {
         if (level == null || player == null) {
             return null;
         }
-        try {
-            Field sessionsField = VillageSecurityController.class.getDeclaredField("SESSIONS");
-            sessionsField.setAccessible(true);
-            Object value = sessionsField.get(null);
-            if (!(value instanceof Map<?, ?> sessions) || sessions.isEmpty()) {
-                return null;
+        double bestDistance = Double.MAX_VALUE;
+        ActiveSecuritySession best = null;
+        String currentDimension = dimensionId(level);
+        int safeRadius = Math.max(1, radius);
+        double radiusSquared = (double) safeRadius * (double) safeRadius;
+        for (VillageSecurityRuntimeView session : VillageSecurityController.runtimeViews()) {
+            if (session == null) {
+                continue;
             }
-            double bestDistance = Double.MAX_VALUE;
-            ActiveSecuritySession best = null;
-            String currentDimension = dimensionId(level);
-            int safeRadius = Math.max(1, radius);
-            double radiusSquared = (double) safeRadius * (double) safeRadius;
-            for (Object sessionObject : sessions.values()) {
-                if (sessionObject == null) {
-                    continue;
-                }
-                String sessionDimension = stringField(sessionObject, "dimensionId", "");
-                if (!sessionDimension.isBlank() && !"unknown".equals(currentDimension) && !sessionDimension.equals(currentDimension)) {
-                    continue;
-                }
-                int centerX = intField(sessionObject, "centerX", 0);
-                int centerY = intField(sessionObject, "centerY", 0);
-                int centerZ = intField(sessionObject, "centerZ", 0);
-                double dx = player.getX() - (centerX + 0.5D);
-                double dy = player.getY() - centerY;
-                double dz = player.getZ() - (centerZ + 0.5D);
-                double distance = dx * dx + dy * dy + dz * dz;
-                if (distance > radiusSquared || distance >= bestDistance) {
-                    continue;
-                }
-                Object ids = field(sessionObject, "securityGolemIds");
-                if (!(ids instanceof List<?> rawIds)) {
-                    continue;
-                }
-                List<UUID> golemIds = new ArrayList<>();
-                for (Object raw : rawIds) {
-                    if (raw instanceof UUID uuid) {
-                        golemIds.add(uuid);
-                    }
-                }
-                bestDistance = distance;
-                String raidKey = stringField(sessionObject, "raidKey", "");
-                best = new ActiveSecuritySession(raidKey, sessionDimension, centerX, centerY, centerZ, golemIds);
+            String sessionDimension = session.dimensionId() == null ? "" : session.dimensionId();
+            if (!sessionDimension.isBlank() && !"unknown".equals(currentDimension) && !sessionDimension.equals(currentDimension)) {
+                continue;
             }
-            return best;
-        } catch (Throwable throwable) {
-            if (!warnedSessionAccess) {
-                warnedSessionAccess = true;
-                System.out.println("[Raid Enhancement Patch] Battle support items could not read active village-security sessions: " + throwable);
+            int centerX = session.centerX();
+            int centerY = session.centerY();
+            int centerZ = session.centerZ();
+            double dx = player.getX() - (centerX + 0.5D);
+            double dy = player.getY() - centerY;
+            double dz = player.getZ() - (centerZ + 0.5D);
+            double distance = dx * dx + dy * dy + dz * dz;
+            if (distance > radiusSquared || distance >= bestDistance) {
+                continue;
             }
-            return null;
+            bestDistance = distance;
+            best = new ActiveSecuritySession(session.raidKey(), sessionDimension,
+                    centerX, centerY, centerZ, session.securityGolemIds());
         }
-    }
-
-    private static Object field(Object target, String name) throws ReflectiveOperationException {
-        Field field = target.getClass().getDeclaredField(name);
-        field.setAccessible(true);
-        return field.get(target);
-    }
-
-    private static String stringField(Object target, String name, String fallback) {
-        try {
-            Object value = field(target, name);
-            if (value != null) {
-                return String.valueOf(value);
-            }
-        } catch (Throwable ignored) {
-            // fall through
-        }
-        return fallback;
-    }
-
-    private static int intField(Object target, String name, int fallback) {
-        try {
-            Object value = field(target, name);
-            if (value instanceof Number number) {
-                return number.intValue();
-            }
-        } catch (Throwable ignored) {
-            // fall through
-        }
-        return fallback;
+        return best;
     }
 
     private static boolean isIronGolem(Object entity) {

@@ -4,6 +4,7 @@ import com.noah.raidenhancement.config.RaidEnhancementConfig;
 import com.noah.raidenhancement.compat.CachedReflection;
 import com.noah.raidenhancement.compat.MobEffectCompat;
 import com.noah.raidenhancement.integration.RaidsEnhancedIds;
+import com.noah.raidenhancement.raid.runtime.RaidRuntimeView;
 import com.noah.raidenhancement.villager.ProtectedVillagerState;
 import com.noah.raidenhancement.villager.RaidAutoVillagerProtector;
 import com.noah.raidenhancement.villager.VillagerProtectionController;
@@ -121,6 +122,18 @@ public final class RaidExtraWaveController {
     private static boolean announcedLifecyclePersistence;
 
     private RaidExtraWaveController() {
+    }
+
+    /**
+     * Returns a narrow read-only boundary for presentation and diagnostics.
+     * Consumers must not reflect into {@link ExtraWaveState}; state mutations remain owned
+     * by this controller until the staged RaidRuntime migration is complete.
+     */
+    public static RaidRuntimeView runtimeView(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        return STATES.get(key);
     }
 
     public static void tick(ServerLevel level) {
@@ -4357,7 +4370,7 @@ public final class RaidExtraWaveController {
         }
     }
 
-    private static final class ExtraWaveState {
+    private static final class ExtraWaveState implements RaidRuntimeView {
         final String key;
         final String dimensionId;
         int centerX;
@@ -4449,6 +4462,21 @@ public final class RaidExtraWaveController {
 
         int extraWavesNeeded() {
             return RaidWaveAuthority.customWaveCount(logicalTargetWaves);
+        }
+
+        @Override
+        public String key() {
+            return key;
+        }
+
+        @Override
+        public Object nativeRaidHandle() {
+            return nativeRaid;
+        }
+
+        @Override
+        public boolean completed() {
+            return completed;
         }
     }
 }

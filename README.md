@@ -1,11 +1,11 @@
 # Raid Enhancement Patch
 
-Current version: `0.9.1.6-config-audit-alpha`
+Current version: `0.9.1.9-runtime-boundary-alpha`
 
-0.9.1.6 is a read-only configuration audit version. It preserves the tested 0.9.1.5 VillageFavorGateway boundary and existing gameplay behavior, adds a startup audit marker, and ships a 417-row configuration inventory plus a focused Markdown summary.
+0.9.1.9 is the first behavior-preserving architecture foundation based on the user-tested 0.9.1.8 safe-spawn alpha.
 
-It does not delete, rename, migrate or change any configuration key, default, loaded value or runtime consumer. It also does not change VillageFavor, rewards, gifts, cooldowns, persistence, keys, BossBar behavior, raid waves or Mixin enablement.
+It introduces one server-level tick coordinator and immutable runtime views for BossBar and battle-support consumers. It removes internal reflection into `RaidExtraWaveController.STATES` and `VillageSecurityController.SESSIONS` without changing gameplay rules.
 
 ## Current architecture-governance delivery
 
-`0.9.1.6-config-audit-alpha` identifies active, hardcoded and loaded-but-unused configuration entries. `rareGiftChanceMultiplier` and `equalXpPerEligiblePlayer` are documented as currently ineffective, but are not fixed in this version.
+The legacy controllers still own runtime state in this stage. Later releases will migrate one subsystem at a time behind the new boundaries. Configuration keys, persistence files, wave plans, spawning, rewards, VillageFavor, BossBar behavior and enabled Mixins remain compatible with 0.9.1.8.

@@ -9,7 +9,7 @@ import com.noah.raidenhancement.config.ConfigAuditService;
 import com.noah.raidenhancement.event.VillagerProtectionEvents;
 import com.noah.raidenhancement.event.BattleSupportEvents;
 import com.noah.raidenhancement.event.VillageFavorEvents;
-import com.noah.raidenhancement.event.RaidWaveExpansionEvents;
+import com.noah.raidenhancement.event.RaidTickCoordinator;
 import com.noah.raidenhancement.raid.RaidSessionManager;
 import com.noah.raidenhancement.raid.RaidKeyDiagnostics;
 import com.noah.raidenhancement.raid.GolemBlockRollbackGuard;
@@ -19,16 +19,15 @@ import com.noah.raidenhancement.villager.VillagerProtectionController;
 import net.neoforged.fml.common.Mod;
 
 /**
- * Step 3 entrypoint for the independent NeoForge raid enhancement patch.
+ * NeoForge entrypoint for the independent raid enhancement patch.
  *
- * Stage 0.4.0 starts Step 4. It keeps the user-tested 0.3.9 villager
- * protection baseline and adds compatibility-first raid total wave expansion.
- * Multi-spawn points and special raider injection remain disabled.
+ * <p>0.9.1.9 introduces a single server-level tick coordinator while preserving
+ * the tested controller order and all 0.9.1.8 gameplay behavior.</p>
  */
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.8-safe-spawn-validation-alpha";
+    public static final String VERSION = "0.9.1.9-runtime-boundary-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -41,15 +40,15 @@ public final class RaidEnhancementPatch {
         RaidKeyDiagnostics.logStartup(VERSION);
         RaidSessionManager.bootstrap();
         VillagerProtectionController.bootstrap();
+        registerNeoForgeEventBus(new RaidTickCoordinator());
         registerNeoForgeEventBus(new VillagerProtectionEvents());
-        registerNeoForgeEventBus(new RaidWaveExpansionEvents());
         registerNeoForgeEventBus(new BattleSupportEvents());
         registerNeoForgeEventBus(new VillageFavorEvents());
         registerClientHudIfAvailable();
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Safe-spawn validation stage based on the 0.9.1.7 performance hotfix. Patch-owned raid entities now receive bounded, per-entity bounding-box validation with loaded-chunk, world-border, fluid, hazard and support checks before joining the world. Spawn-search work is capped per entity and per server tick. " + GolemBlockRollbackGuard.hotfixMarker() + ". BossBar, raid wave counts, settlement keys, rewards, VillageFavor, persistence formats and Mixin enablement are unchanged.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Runtime-boundary foundation: one server-level tick coordinator preserves the tested villager, raid and battle-support execution order; BossBar reads active raid handles through a typed runtime view instead of reflecting into controller-private state. " + GolemBlockRollbackGuard.hotfixMarker() + ". Safe spawning, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor, persistence formats, configuration defaults and Mixin enablement are unchanged.");
     }
 
     /**

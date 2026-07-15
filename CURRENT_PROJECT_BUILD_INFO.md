@@ -1,17 +1,17 @@
 # Current Project Build Info
 
-Current stage: P0 runtime stabilization and foundational defect repair.
+Current stage: behavior-preserving runtime architecture foundation.
 
-Current delivery: `0.9.1.7-reflection-cache-hotfix-alpha`
+Current delivery: `0.9.1.9-runtime-boundary-alpha`
 
-Direct source baseline: `0.9.1.6-config-audit-alpha`.
+Direct source baseline: `0.9.1.8-safe-spawn-validation-alpha`.
 
-Behavior comparison baseline: `0.9.1.5-village-favor-gateway-audit-alpha`.
+Behavior comparison baseline: user-tested `0.9.1.8-safe-spawn-validation-alpha` JAR, SHA-256 `5CC761327877FE3042D317DDFD6F50BDA82C65A2FF2786470BFC6558F83FA330`.
 
 Emergency safety anchor: `0.9.1.0-victory-bar-attach-guard-alpha`.
 
-0.9.1.6 had not begun its planned regression test, but the Spark problem scene was run with 0.9.1.6 installed. The 0.9.1.7 hotfix therefore branches directly from the complete 0.9.1.6 source.
+0.9.1.9 centralizes all LevelTickEvent handling in RaidTickCoordinator while retaining the previous event-registration execution order. BossBar and battle-support modules now consume immutable runtime views instead of reflecting into private controller maps.
 
-0.9.1.7 addresses repeated reflection discovery, unbounded rollback work amplification, duplicate golem snapshots, collision-unsafe restoration and redundant villager protection maintenance. It does not fix the separate unsafe extra-wave spawn-position design defect.
+No gameplay, configuration, persistence or enabled-Mixin change is intended in this stage. The next architecture stage must not begin until this boundary release passes the 0.9.1.8 regression checklist.
 
-The supplied source remains independently Gradle-buildable with the included Wrapper when network dependencies are available. The local JAR is a Java 21 binary-overlay alpha artifact because this environment cannot download Gradle/NeoForge dependencies.
+The supplied source remains independently Gradle-buildable with the included Wrapper and GitHub Actions Java 21 workflow. This local environment only has Java 11, so it cannot produce the Java 21 JAR locally.
