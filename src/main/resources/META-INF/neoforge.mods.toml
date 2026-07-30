@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.1.9-runtime-boundary-alpha"
+version="0.9.1.10-bounded-spawn-queue-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.1.9 is the first behavior-preserving runtime-boundary refactor based on the user-tested 0.9.1.8 safe-spawn alpha. It centralizes server-level tick orchestration and replaces cross-controller private-state reflection with immutable runtime views. Safe spawning, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor, persistence formats, configuration defaults and enabled Mixins are unchanged.
+Stage 0.9.1.10 executes patch-owned raid spawn plans through a bounded, idempotent, retryable server-side queue. It prevents partial safe-spawn success from discarding the remaining Hard Omen V attackers while preserving collision, fluid, hazard, support, border and loaded-chunk validation. BossBar behavior, wave composition, settlement keys, rewards, VillageFavor, persistence formats and enabled Mixins are unchanged.
 '''
 
 [[mixins]]

@@ -1,8 +1,8 @@
 # Current Project Build Info
 
-Current stage: behavior-preserving runtime architecture foundation.
+Current stage: bounded safe-spawn execution hotfix.
 
-Current delivery: `0.9.1.9-runtime-boundary-alpha`
+Current delivery: `0.9.1.10-bounded-spawn-queue-alpha`
 
 Direct source baseline: `0.9.1.8-safe-spawn-validation-alpha`.
 
@@ -10,8 +10,8 @@ Behavior comparison baseline: user-tested `0.9.1.8-safe-spawn-validation-alpha` 
 
 Emergency safety anchor: `0.9.1.0-victory-bar-attach-guard-alpha`.
 
-0.9.1.9 centralizes all LevelTickEvent handling in RaidTickCoordinator while retaining the previous event-registration execution order. BossBar and battle-support modules now consume immutable runtime views instead of reflecting into private controller maps.
+0.9.1.10 retains the centralized LevelTickEvent coordinator and immutable runtime views. Patch-owned main, side and Raids Enhanced special spawn plans now execute through a per-raid bounded queue so partial safe-spawn results cannot silently discard the remaining planned attackers.
 
-No gameplay, configuration, persistence or enabled-Mixin change is intended in this stage. The next architecture stage must not begin until this boundary release passes the 0.9.1.8 regression checklist.
+Wave composition, safe-position rules, persistence format and enabled Mixins remain unchanged. Spawn execution is spread across bounded server ticks and failed slots rotate through planned anchors before being exhausted.
 
-The supplied source remains independently Gradle-buildable with the included Wrapper and GitHub Actions Java 21 workflow. This local environment only has Java 11, so it cannot produce the Java 21 JAR locally.
+The supplied source remains independently Gradle-buildable with the included Wrapper and GitHub Actions Java 21 workflow. The local preferred runtime is Zulu JDK 21.0.8.

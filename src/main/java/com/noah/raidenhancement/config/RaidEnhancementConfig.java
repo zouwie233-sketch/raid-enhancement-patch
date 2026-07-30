@@ -289,6 +289,14 @@ public final class RaidEnhancementConfig {
     public static final int EXTRA_WAVE_SAFE_SPAWN_MAX_CHECKS_PER_TICK = 2048;
     public static final int EXTRA_WAVE_SAFE_AIR_CLEARANCE = 20;
 
+    // 0.9.1.10 bounded spawn execution. Plans keep their exact composition, while
+    // only a small number of slots are attempted on each server tick. Failed safe
+    // positions rotate across the planned anchors instead of discarding the rest of
+    // a partially successful high-omen wave.
+    public static final int RAID_SPAWN_QUEUE_MAX_SLOTS_PER_TICK = 8;
+    public static final int RAID_SPAWN_QUEUE_GLOBAL_MAX_SLOTS_PER_LEVEL_TICK = 16;
+    public static final int RAID_SPAWN_QUEUE_MAX_ATTEMPTS_PER_SLOT = 12;
+
     // Step 5 preview: only the custom extra waves use multi-spawn points.
     // Vanilla native waves 1-8 remain untouched. Each point is still a small
     // concentrated squad, and every raider still goes through finalizeSpawn + joinRaid.

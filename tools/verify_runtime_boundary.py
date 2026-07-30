@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static architecture contract checks for the 0.9.1.9 runtime-boundary stage."""
+"""Static architecture and bounded-spawn contracts for 0.9.1.10."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 JAVA_ROOT = ROOT / "src/main/java/com/noah/raidenhancement"
-EXPECTED_VERSION = "0.9.1.9-runtime-boundary-alpha"
+EXPECTED_VERSION = "0.9.1.10-bounded-spawn-queue-alpha"
 
 
 def require(condition: bool, message: str) -> None:
@@ -83,14 +83,39 @@ def verify_no_removed_bridges() -> None:
     require(not any(path.exists() for path in removed), "removed legacy bridge source reappeared")
 
 
+def verify_bounded_spawn_queue() -> None:
+    controller = text(JAVA_ROOT / "raid/RaidExtraWaveController.java")
+    queue = text(JAVA_ROOT / "raid/RaidSpawnWorkQueue.java")
+    tick_budget = text(JAVA_ROOT / "raid/RaidSpawnTickBudget.java")
+    resolver = text(JAVA_ROOT / "raid/SafeRaidSpawnResolver.java")
+    config = text(JAVA_ROOT / "config/RaidEnhancementConfig.java")
+    require("processPendingSpawnWork(level, state, gameTime);" in controller,
+            "raid controller does not drain bounded spawn work")
+    require("spawnCustomWaveWithMainAndReinforcements" not in controller,
+            "legacy all-at-once custom spawning remains")
+    require("RAID_SPAWN_QUEUE_MAX_SLOTS_PER_TICK = 8" in config,
+            "bounded per-tick slot limit changed")
+    require("RAID_SPAWN_QUEUE_MAX_ATTEMPTS_PER_SLOT = 12" in config,
+            "bounded per-slot retry limit changed")
+    require("RAID_SPAWN_QUEUE_GLOBAL_MAX_SLOTS_PER_LEVEL_TICK = 16" in config,
+            "shared per-level tick limit changed")
+    require("reservedBatchIds" in queue and "preferredAnchorIndex() + pending.attempts" in queue,
+            "spawn idempotency or anchor rotation contract is missing")
+    require("WeakHashMap" in tick_budget and "budget.remaining -= granted" in tick_budget,
+            "shared tick admission budget contract is missing")
+    for safety_check in ["hasChunkAt", "isWithinBounds", "noCollision", "containsFluidOrHazard", "hasStableSupport"]:
+        require(safety_check in resolver, f"safe-spawn check disappeared: {safety_check}")
+
+
 def main() -> None:
     verify_versions()
     verify_single_tick_entrypoint()
     verify_runtime_boundaries()
     verify_mixins()
     verify_no_removed_bridges()
+    verify_bounded_spawn_queue()
     java_count = sum(1 for _ in JAVA_ROOT.rglob("*.java"))
-    require(java_count == 84, f"unexpected top-level Java source count: {java_count}")
+    require(java_count == 86, f"unexpected top-level Java source count: {java_count}")
     print(f"[runtime-boundary] PASS: version={EXPECTED_VERSION}, javaSources={java_count}")
 
 

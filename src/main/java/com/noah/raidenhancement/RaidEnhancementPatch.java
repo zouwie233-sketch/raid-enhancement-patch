@@ -21,13 +21,13 @@ import net.neoforged.fml.common.Mod;
 /**
  * NeoForge entrypoint for the independent raid enhancement patch.
  *
- * <p>0.9.1.9 introduces a single server-level tick coordinator while preserving
- * the tested controller order and all 0.9.1.8 gameplay behavior.</p>
+ * <p>0.9.1.10 adds bounded, retryable spawn-plan execution on top of the 0.9.1.9
+ * runtime boundary while retaining the 0.9.1.8 safe-position authority.</p>
  */
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.9-runtime-boundary-alpha";
+    public static final String VERSION = "0.9.1.10-bounded-spawn-queue-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);

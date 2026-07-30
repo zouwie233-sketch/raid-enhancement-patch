@@ -1,0 +1,49 @@
+Raid Enhancement Patch 0.9.1.10 bounded spawn queue checklist
+
+[BUILD]
+[ ] GitHub Actions architecture and spawn-queue contracts pass
+[ ] Gradle clean build passes on Java 21
+[ ] Built JAR reports 0.9.1.10-bounded-spawn-queue-alpha
+
+[HARD OMEN V - OPEN TERRAIN]
+[ ] Complete logical waves 1-11 with the 0.9.1.8 configuration
+[ ] Wave 11 batch summary reports planned=62, spawned=62, exhausted=0
+[ ] Main group, five side squads and eight planned specials are observable
+[ ] No duplicate slot/entity pack appears on later ticks
+[ ] Victory waits until wave 11 is cleared
+
+[HARD OMEN V - DENSE/UNEVEN TERRAIN]
+[ ] Test village houses, walls, trees, hills, cliffs and nearby water
+[ ] Failed positions rotate to other planned anchors over several ticks
+[ ] Raiders never spawn inside blocks, fluids or unsupported air
+[ ] No distant chunk is force-loaded and no terrain is broken
+[ ] Batch summary normally reaches spawned=planned; record any exhausted count
+
+[NATIVE WAVE REGRESSION]
+[ ] Hard wave 8 side batch plans 25 attackers (5 points x 5)
+[ ] Hard wave 8 special batch retains its configured count
+[ ] Optional native work stops if the native wave advances
+[ ] Leaving the battlefield pauses queued execution
+
+[MULTIPLAYER]
+[ ] Two simultaneous raids do not exceed 16 admitted slots per level tick
+[ ] One raid cannot duplicate or consume another raid's slots
+[ ] Different dimensions retain independent state and BossBars
+
+[SAFETY REGRESSION]
+[ ] Loaded-chunk, world-border and build-height checks still apply
+[ ] Real entity bounding-box collision check still applies
+[ ] Fluid, hazard and stable-support checks still apply
+[ ] Ravagers and Raids Enhanced ground specials relocate safely
+[ ] Blimps use safe air placement
+[ ] Failed world insertion leaves no ghost native Raid member
+
+[LIFECYCLE]
+[ ] Normal disconnect/reconnect without server stop resumes the same queue safely
+[ ] Test a controlled server stop while wave 11 is still draining
+[ ] Do not promote stable if restart loses pending slots or creates duplicates
+
+[PERFORMANCE]
+[ ] Compare 60-second Spark captures with 0.9.1.9 in the same scene
+[ ] No sustained SafeRaidSpawnResolver or reflection hotspot
+[ ] No spawn-time MSPT spike above the previous single-tick implementation
