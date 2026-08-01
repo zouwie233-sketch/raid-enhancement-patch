@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static architecture and bounded-spawn contracts for 0.9.1.10."""
+"""Static architecture and persistent bounded-spawn contracts for 0.9.1.11."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 JAVA_ROOT = ROOT / "src/main/java/com/noah/raidenhancement"
-EXPECTED_VERSION = "0.9.1.10-bounded-spawn-queue-alpha"
+EXPECTED_VERSION = "0.9.1.11-raid-spawn-persistence-beta"
 
 
 def require(condition: bool, message: str) -> None:
@@ -87,6 +87,8 @@ def verify_bounded_spawn_queue() -> None:
     controller = text(JAVA_ROOT / "raid/RaidExtraWaveController.java")
     queue = text(JAVA_ROOT / "raid/RaidSpawnWorkQueue.java")
     tick_budget = text(JAVA_ROOT / "raid/RaidSpawnTickBudget.java")
+    codec = text(JAVA_ROOT / "raid/RaidSpawnQueuePersistenceCodec.java")
+    key_service = text(JAVA_ROOT / "raid/RaidKeyService.java")
     resolver = text(JAVA_ROOT / "raid/SafeRaidSpawnResolver.java")
     config = text(JAVA_ROOT / "config/RaidEnhancementConfig.java")
     require("processPendingSpawnWork(level, state, gameTime);" in controller,
@@ -103,6 +105,18 @@ def verify_bounded_spawn_queue() -> None:
             "spawn idempotency or anchor rotation contract is missing")
     require("WeakHashMap" in tick_budget and "budget.remaining -= granted" in tick_budget,
             "shared tick admission budget contract is missing")
+    require("QueueSnapshot" in queue and "RestoreReport restore" in queue,
+            "queue snapshot/restore contract is missing")
+    require("MAX_PENDING_SLOTS = 512" in codec and "spawnQueueSnapshot" in controller,
+            "bounded persistence codec or lifecycle integration is missing")
+    require("persistLifecycleSnapshot(state, gameTime, true);" in controller,
+            "spawn queue does not checkpoint event-driven changes")
+    require("nativeRaidNumericId" in key_service and "differentNativeRaid" in controller,
+            "stable native raid identity guard is missing")
+    require("StandardCopyOption.ATOMIC_MOVE" in controller and "lifecycleSnapshotsDirty" in controller,
+            "atomic/coalesced lifecycle persistence is missing")
+    require("raid_spawn_queue.properties" in config and "1, 32" in config and "1, 128" in config,
+            "clamped server spawn-queue config is missing")
     for safety_check in ["hasChunkAt", "isWithinBounds", "noCollision", "containsFluidOrHazard", "hasStableSupport"]:
         require(safety_check in resolver, f"safe-spawn check disappeared: {safety_check}")
 
@@ -115,7 +129,7 @@ def main() -> None:
     verify_no_removed_bridges()
     verify_bounded_spawn_queue()
     java_count = sum(1 for _ in JAVA_ROOT.rglob("*.java"))
-    require(java_count == 86, f"unexpected top-level Java source count: {java_count}")
+    require(java_count == 87, f"unexpected top-level Java source count: {java_count}")
     print(f"[runtime-boundary] PASS: version={EXPECTED_VERSION}, javaSources={java_count}")
 
 

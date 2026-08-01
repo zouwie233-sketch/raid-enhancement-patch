@@ -1,0 +1,51 @@
+Raid Enhancement Patch 0.9.1.11 persistent spawn queue checklist
+
+[BUILD]
+[ ] GitHub Actions static and queue persistence contracts pass
+[ ] Gradle clean build passes on Java 21
+[ ] Built JAR reports 0.9.1.11-raid-spawn-persistence-beta
+
+[CONTROLLED RESTART - CUSTOM WAVE]
+[ ] Start Hard Omen V wave 11 and stop the server while the batch is pending
+[ ] Confirm raid_session_lifecycle.properties contains spawnQueue.format=1
+[ ] Restart and observe one bounded queue restore summary
+[ ] Only remaining slots spawn; completed checkpointed slots are not rebuilt
+[ ] Final batch accounting reaches the original planned total
+
+[CONTROLLED RESTART - NATIVE WAVE]
+[ ] Stop during a pending native side or special batch
+[ ] Restart on the same native raid ID and confirm remaining work resumes
+[ ] Advance the native wave and confirm stale optional slots close permanently
+[ ] Start a new raid at the same village and confirm it inherits no old batch
+
+[CORRUPTION SAFETY]
+[ ] Back up the lifecycle sidecar, then corrupt one queue slot in a test world
+[ ] The affected batch is rejected without a crash
+[ ] Other lifecycle sessions remain readable
+[ ] Restore the original sidecar after the test
+
+[CONFIG]
+[ ] raid_spawn_queue.properties is created with defaults 8, 16 and 12
+[ ] Values outside limits are clamped
+[ ] Global limit cannot remain below per-raid limit
+[ ] diagnostics.batchCompletion=false suppresses successful batch summaries
+[ ] persistence.enabled=false runs the queue without writing queue snapshots
+
+[MULTIPLAYER/PERFORMANCE]
+[ ] Two same-dimension raids remain within 16 slot attempts per tick
+[ ] Multiple dirty changes produce at most one sidecar replacement per processed level tick
+[ ] Sidecar write failure does not retry more often than once per 200 ticks
+[ ] No entity/chunk scan is introduced by queue restore
+[ ] Compare MSPT and disk activity with 0.9.1.10
+
+[SAFETY REGRESSION]
+[ ] Loaded-chunk, border, collision, fluid, hazard and support checks still apply
+[ ] No terrain is broken and no chunk is force-loaded
+[ ] Ravagers, ground specials and blimps retain their safe placement rules
+[ ] Leaving the battlefield pauses queued execution
+
+[BETA CRASH SOAK]
+[ ] Test forced process termination during queue drain on a copied world
+[ ] Inspect for duplicate or missing attackers after restart
+[ ] Do not claim transactional exactly-once behavior until repeated crash-soak passes
+

@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.1.10-bounded-spawn-queue-alpha"
+version="0.9.1.11-raid-spawn-persistence-beta"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.1.10 executes patch-owned raid spawn plans through a bounded, idempotent, retryable server-side queue. It prevents partial safe-spawn success from discarding the remaining Hard Omen V attackers while preserving collision, fluid, hazard, support, border and loaded-chunk validation. BossBar behavior, wave composition, settlement keys, rewards, VillageFavor, persistence formats and enabled Mixins are unchanged.
+Stage 0.9.1.11 persists validated bounded spawn-queue snapshots in existing raid lifecycle metadata. Remaining slots, retry counters, anchors and batch reservations recover after a server restart. Queue limits are available through a clamped server config. Collision, fluid, hazard, support, border and loaded-chunk validation remain authoritative; wave composition and enabled Mixins are unchanged.
 '''
 
 [[mixins]]

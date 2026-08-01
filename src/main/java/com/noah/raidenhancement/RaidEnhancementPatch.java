@@ -21,13 +21,13 @@ import net.neoforged.fml.common.Mod;
 /**
  * NeoForge entrypoint for the independent raid enhancement patch.
  *
- * <p>0.9.1.10 adds bounded, retryable spawn-plan execution on top of the 0.9.1.9
- * runtime boundary while retaining the 0.9.1.8 safe-position authority.</p>
+ * <p>0.9.1.11 checkpoints the bounded spawn queue into the existing raid lifecycle
+ * sidecar and restores only validated remaining slots after a server restart.</p>
  */
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.10-bounded-spawn-queue-alpha";
+    public static final String VERSION = "0.9.1.11-raid-spawn-persistence-beta";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -48,7 +48,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Runtime-boundary foundation: one server-level tick coordinator preserves the tested villager, raid and battle-support execution order; BossBar reads active raid handles through a typed runtime view instead of reflecting into controller-private state. " + GolemBlockRollbackGuard.hotfixMarker() + ". Safe spawning, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor, persistence formats, configuration defaults and Mixin enablement are unchanged.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Bounded spawn batches now checkpoint remaining slots into raid lifecycle metadata and recover validated work after restart. " + GolemBlockRollbackGuard.hotfixMarker() + ". Safe-position authority, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor and Mixin enablement are unchanged.");
     }
 
     /**

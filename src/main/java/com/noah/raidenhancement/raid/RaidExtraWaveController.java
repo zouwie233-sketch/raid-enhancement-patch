@@ -19,6 +19,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
 import java.util.Base64;
 import java.util.Properties;
 import java.util.ArrayList;
@@ -121,6 +123,9 @@ public final class RaidExtraWaveController {
     private static boolean lifecycleSnapshotsLoaded;
     private static boolean warnedLifecyclePersistenceFailure;
     private static boolean announcedLifecyclePersistence;
+    private static boolean warnedSpawnQueueRestoreRejection;
+    private static boolean lifecycleSnapshotsDirty;
+    private static long lifecyclePersistenceRetryNotBeforeGameTime;
 
     private RaidExtraWaveController() {
     }
@@ -175,6 +180,7 @@ public final class RaidExtraWaveController {
             if (processInterval <= 1 || gameTime % Math.max(1, processInterval) == 0L) {
                 processExtraWaveStates(level, gameTime);
             }
+            flushLifecycleSnapshotsIfDirty(gameTime);
         } catch (Throwable throwable) {
             if (!warnedTickFailure) {
                 warnedTickFailure = true;
@@ -356,6 +362,8 @@ public final class RaidExtraWaveController {
             state = new ExtraWaveState(key, dimensionId(level), center[0], center[1], center[2], difficulty, omen,
                     nativeSafeMax, plannedTarget, gameTime);
             state.nativeRaid = raid;
+            Integer nativeRaidId = RaidKeyService.nativeRaidNumericId(raid);
+            state.nativeRaidNumericId = nativeRaidId == null ? -1 : nativeRaidId;
             state.observedNativeTargetWaves = Math.max(0, getNativeNumGroups(raid));
             applyPersistedLifecycleSnapshotIfFresh(state, gameTime);
             STATES.put(key, state);
@@ -781,6 +789,7 @@ public final class RaidExtraWaveController {
             // The wave is reserved, but it is not considered fully emitted. The bounded
             // queue drains exact idempotent slots over subsequent server ticks.
             publishHudSnapshot(state, gameTime);
+            persistLifecycleSnapshot(state, gameTime, true);
             return;
         }
 
@@ -1933,7 +1942,11 @@ public final class RaidExtraWaveController {
         }
         RaidSpawnWorkQueue.BatchPlan plan = new RaidSpawnWorkQueue.BatchPlan(
                 specialSpawnBatchId(logicalWave), logicalWave, plannedAnchors, slots);
-        return state.spawnWorkQueue.enqueue(plan) ? slots.size() : 0;
+        if (!state.spawnWorkQueue.enqueue(plan)) {
+            return 0;
+        }
+        persistLifecycleSnapshot(state, gameTime, true);
+        return slots.size();
     }
 
     private static int countNearbyRaidsEnhancedSpecialRaiders(ServerLevel level, ExtraWaveState state, int radius) {
@@ -2228,6 +2241,7 @@ public final class RaidExtraWaveController {
                 nativeSideSpawnBatchId(nativeWave), nativeWave, plannedAnchors, slots);
         if (state.spawnWorkQueue.enqueue(plan)) {
             publishHudSnapshot(state, gameTime);
+            persistLifecycleSnapshot(state, gameTime, true);
         }
     }
 
@@ -2455,10 +2469,12 @@ public final class RaidExtraWaveController {
             publishHudSnapshot(state, gameTime);
         }
         for (RaidSpawnWorkQueue.BatchResult result : state.spawnWorkQueue.pollCompleted()) {
-            System.out.println("[Raid Enhancement Patch] Spawn batch completed: raid=" + state.key
-                    + ", batch=" + result.batchId() + ", wave=" + result.logicalWave()
-                    + ", planned=" + result.planned() + ", spawned=" + result.spawned()
-                    + ", exhausted=" + result.exhausted() + ".");
+            if (RaidEnhancementConfig.RAID_SPAWN_QUEUE_BATCH_DIAGNOSTICS_ENABLED) {
+                System.out.println("[Raid Enhancement Patch] Spawn batch completed: raid=" + state.key
+                        + ", batch=" + result.batchId() + ", wave=" + result.logicalWave()
+                        + ", planned=" + result.planned() + ", spawned=" + result.spawned()
+                        + ", exhausted=" + result.exhausted() + ".");
+            }
             if (result.batchId().startsWith("custom:") && result.allFailed()
                     && state.activeCustomLogicalWave == result.logicalWave()) {
                 rollbackAllFailedCustomWave(level, state, result.logicalWave(), result.batchId(), gameTime);
@@ -2468,6 +2484,10 @@ public final class RaidExtraWaveController {
                 state.bridgeHoldActive = false;
                 state.failedSpawnRetries = 0;
             }
+        }
+        if (report.attempted() > 0) {
+            // One checkpoint per bounded drain, never one synchronous write per entity.
+            persistLifecycleSnapshot(state, gameTime, true);
         }
     }
 
@@ -3035,6 +3055,7 @@ public final class RaidExtraWaveController {
         state.completed = true;
         state.completedGameTime = gameTime;
         state.currentWaveActive = false;
+        state.spawnWorkQueue.clear();
         rememberTerminatedRaidKey(state.key, gameTime);
         removeLifecycleSnapshot(state.key);
         RaidSessionManager.get(state.key).ifPresent(session -> session.markCompleted("raid_state_completed", gameTime));
@@ -4031,7 +4052,7 @@ public final class RaidExtraWaveController {
         }
         long ttl = Math.max(1L, RaidEnhancementConfig.RAID_SESSION_LIFECYCLE_RESTORE_TTL_TICKS);
         if (snapshot.lastSeenGameTime() > 0L && gameTime - snapshot.lastSeenGameTime() > ttl) {
-            PERSISTED_LIFECYCLE_SNAPSHOTS.remove(state.key);
+            removeLifecycleSnapshot(state.key);
             return;
         }
 
@@ -4041,17 +4062,21 @@ public final class RaidExtraWaveController {
                 && state.omenLevel == snapshot.omenLevel()
                 && currentPlanTarget == snapshotPlanTarget
                 && Math.max(1, snapshot.logicalTargetWaves()) == Math.max(1, currentPlanTarget);
-        boolean freshNativeRaidJustStarted = state.nativeRaid != null
+        Integer currentNativeRaidId = RaidKeyService.nativeRaidNumericId(state.nativeRaid);
+        boolean stableRaidIdentityAvailable = currentNativeRaidId != null && snapshot.nativeRaidNumericId() >= 0;
+        boolean differentNativeRaid = stableRaidIdentityAvailable
+                && currentNativeRaidId.intValue() != snapshot.nativeRaidNumericId();
+        boolean ambiguousFreshNativeRaid = !stableRaidIdentityAvailable
+                && state.nativeRaid != null
                 && !isRaidFinished(state.nativeRaid)
                 && getGroupsSpawned(state.nativeRaid) <= 1;
         boolean snapshotWouldArmNonCustomRaid = currentPlanTarget <= RaidWaveAuthority.NATIVE_WAVE_LIMIT
                 && (snapshot.armedForExtraWaves() || snapshot.customWavesSpawned() > 0
                 || snapshot.bridgeHoldActive() || snapshot.currentWaveActive());
-        if (!samePlan || freshNativeRaidJustStarted || snapshotWouldArmNonCustomRaid) {
+        if (!samePlan || differentNativeRaid || ambiguousFreshNativeRaid || snapshotWouldArmNonCustomRaid) {
             // 0.8.9.8.4: lifecycle snapshots are keyed by village center. A new raid in
             // the same village must not inherit the previous raid's omen/target/custom
             // progress, otherwise an 8-wave raid can spawn a stale 9-11 chain.
-            PERSISTED_LIFECYCLE_SNAPSHOTS.remove(state.key);
             removeLifecycleSnapshot(state.key);
             return;
         }
@@ -4081,6 +4106,28 @@ public final class RaidExtraWaveController {
         copyEncodedIntSet(snapshot.specialReinforcedWaves(), state.specialReinforcedWaves);
         state.normalRaidsEnhancedSpecialDone = state.normalRaidsEnhancedSpecialDone || snapshot.normalRaidsEnhancedSpecialDone();
         state.knownRaiderCacheWave = Math.max(state.knownRaiderCacheWave, snapshot.knownRaiderCacheWave());
+        state.nativeRaidNumericId = currentNativeRaidId == null
+                ? snapshot.nativeRaidNumericId() : currentNativeRaidId;
+        if (RaidEnhancementConfig.RAID_SPAWN_QUEUE_PERSISTENCE_ENABLED
+                && !state.spawnWorkQueue.hasPendingWork()
+                && snapshot.spawnQueueSnapshot() != null) {
+            RaidSpawnWorkQueue.RestoreReport restore = state.spawnWorkQueue.restore(snapshot.spawnQueueSnapshot());
+            if (restore.restoredPendingSlots() > 0) {
+                System.out.println("[Raid Enhancement Patch] Restored bounded spawn queue: raid=" + state.key
+                        + ", batches=" + restore.restoredBatches() + ", pending="
+                        + restore.restoredPendingSlots() + ".");
+            }
+            if (restore.rejectedBatches() > 0 && !warnedSpawnQueueRestoreRejection) {
+                warnedSpawnQueueRestoreRejection = true;
+                System.out.println("[Raid Enhancement Patch] Rejected one or more invalid persisted spawn batches; "
+                        + "valid raid lifecycle metadata was retained.");
+            }
+            if (restore.rejectedBatches() > 0 && state.currentWaveActive
+                    && state.activeCustomLogicalWave > 0
+                    && !state.spawnWorkQueue.hasPendingWave(state.activeCustomLogicalWave)) {
+                rollbackRejectedPersistedCustomWave(state, gameTime);
+            }
+        }
         state.restoredFromLifecycleSnapshot = true;
         if (!announcedLifecyclePersistence) {
             announcedLifecyclePersistence = true;
@@ -4100,7 +4147,21 @@ public final class RaidExtraWaveController {
         }
         state.lastLifecyclePersistGameTime = gameTime;
         PERSISTED_LIFECYCLE_SNAPSHOTS.put(state.key, PersistedLifecycleSnapshot.fromState(state, gameTime));
-        saveLifecycleSnapshots();
+        lifecycleSnapshotsDirty = true;
+    }
+
+    private static void rollbackRejectedPersistedCustomWave(ExtraWaveState state, long gameTime) {
+        int logicalWave = state.activeCustomLogicalWave;
+        state.specialReinforcedWaves.remove(logicalWave);
+        state.customWavesSpawned = Math.max(0, state.customWavesSpawned - 1);
+        state.activeCustomLogicalWave = -1;
+        state.currentWaveActive = false;
+        state.bridgeHoldActive = true;
+        state.failedSpawnRetries++;
+        state.spawnAnchorWave = -1;
+        state.spawnAnchors = new int[0][];
+        state.nextActionGameTime = gameTime
+                + Math.max(1, RaidEnhancementConfig.EXTRA_WAVE_FAILED_SPAWN_RETRY_DELAY_TICKS);
     }
 
     private static void removeLifecycleSnapshot(String key) {
@@ -4109,7 +4170,7 @@ public final class RaidExtraWaveController {
         }
         ensureLifecycleSnapshotsLoaded();
         if (PERSISTED_LIFECYCLE_SNAPSHOTS.remove(key) != null) {
-            saveLifecycleSnapshots();
+            lifecycleSnapshotsDirty = true;
         }
     }
 
@@ -4125,11 +4186,18 @@ public final class RaidExtraWaveController {
                     || (snapshot.lastSeenGameTime() > 0L && gameTime - snapshot.lastSeenGameTime() > ttl);
         });
         if (before != PERSISTED_LIFECYCLE_SNAPSHOTS.size()) {
-            saveLifecycleSnapshots();
+            lifecycleSnapshotsDirty = true;
         }
     }
 
-    private static void saveLifecycleSnapshots() {
+    private static void flushLifecycleSnapshotsIfDirty(long gameTime) {
+        if (!lifecycleSnapshotsDirty || gameTime < lifecyclePersistenceRetryNotBeforeGameTime) {
+            return;
+        }
+        saveLifecycleSnapshots(gameTime);
+    }
+
+    private static void saveLifecycleSnapshots(long gameTime) {
         if (!RaidEnhancementConfig.RAID_SESSION_LIFECYCLE_PERSISTENCE_ENABLED) {
             return;
         }
@@ -4153,10 +4221,19 @@ public final class RaidExtraWaveController {
                 snapshot.writeTo(properties, safeKey);
             }
             properties.setProperty("keys", keys.toString());
-            try (OutputStream outputStream = Files.newOutputStream(file)) {
-                properties.store(outputStream, "Raid Enhancement Patch 0.8.6 raid session lifecycle metadata");
+            Path tempFile = file.resolveSibling(file.getFileName() + ".tmp");
+            try (OutputStream outputStream = Files.newOutputStream(tempFile)) {
+                properties.store(outputStream, "Raid Enhancement Patch 0.9.1.11 raid lifecycle and spawn queue metadata");
             }
+            try {
+                Files.move(tempFile, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException exception) {
+                Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+            lifecycleSnapshotsDirty = false;
+            lifecyclePersistenceRetryNotBeforeGameTime = 0L;
         } catch (IOException | RuntimeException exception) {
+            lifecyclePersistenceRetryNotBeforeGameTime = gameTime + 200L;
             warnLifecyclePersistence("save", exception);
         }
     }
@@ -4276,7 +4353,9 @@ public final class RaidExtraWaveController {
             String nativeReinforcedWaves,
             String specialReinforcedWaves,
             boolean normalRaidsEnhancedSpecialDone,
-            int knownRaiderCacheWave
+            int knownRaiderCacheWave,
+            int nativeRaidNumericId,
+            RaidSpawnWorkQueue.QueueSnapshot spawnQueueSnapshot
     ) {
         static PersistedLifecycleSnapshot fromState(ExtraWaveState state, long gameTime) {
             return new PersistedLifecycleSnapshot(state.key, state.dimensionId, state.centerX, state.centerY, state.centerZ,
@@ -4286,7 +4365,9 @@ public final class RaidExtraWaveController {
                     state.nativeRaidFinishedObserved, state.bridgeHoldActive, state.completed,
                     state.firstSeenGameTime, Math.max(state.lastSeenGameTime, gameTime),
                     encodeIntSet(state.nativeReinforcedWaves), encodeIntSet(state.specialReinforcedWaves),
-                    state.normalRaidsEnhancedSpecialDone, state.knownRaiderCacheWave);
+                    state.normalRaidsEnhancedSpecialDone, state.knownRaiderCacheWave, state.nativeRaidNumericId,
+                    RaidEnhancementConfig.RAID_SPAWN_QUEUE_PERSISTENCE_ENABLED
+                            ? state.spawnWorkQueue.snapshot() : RaidSpawnWorkQueue.QueueSnapshot.empty());
         }
 
         static PersistedLifecycleSnapshot fromProperties(Properties properties, String safeKey) {
@@ -4324,7 +4405,9 @@ public final class RaidExtraWaveController {
                     properties.getProperty(prefix + "nativeReinforcedWaves", ""),
                     properties.getProperty(prefix + "specialReinforcedWaves", ""),
                     booleanProperty(properties, prefix + "normalRaidsEnhancedSpecialDone", false),
-                    intProperty(properties, prefix + "knownRaiderCacheWave", 0)
+                    intProperty(properties, prefix + "knownRaiderCacheWave", 0),
+                    intProperty(properties, prefix + "nativeRaidNumericId", -1),
+                    RaidSpawnQueuePersistenceCodec.read(properties, prefix + "spawnQueue.")
             );
         }
 
@@ -4355,6 +4438,8 @@ public final class RaidExtraWaveController {
             properties.setProperty(prefix + "specialReinforcedWaves", specialReinforcedWaves == null ? "" : specialReinforcedWaves);
             properties.setProperty(prefix + "normalRaidsEnhancedSpecialDone", Boolean.toString(normalRaidsEnhancedSpecialDone));
             properties.setProperty(prefix + "knownRaiderCacheWave", Integer.toString(knownRaiderCacheWave));
+            properties.setProperty(prefix + "nativeRaidNumericId", Integer.toString(nativeRaidNumericId));
+            RaidSpawnQueuePersistenceCodec.write(properties, prefix + "spawnQueue.", spawnQueueSnapshot);
         }
 
         private static String encodeIntSet(Set<Integer> values) {
@@ -4528,6 +4613,7 @@ public final class RaidExtraWaveController {
         int spawnAnchorWave = -1;
         int[][] spawnAnchors = new int[0][];
         int activeCustomLogicalWave = -1;
+        int nativeRaidNumericId = -1;
         final Set<Integer> nativeReinforcedWaves = new HashSet<>();
         final Set<Integer> specialReinforcedWaves = new HashSet<>();
         final RaidSpawnWorkQueue spawnWorkQueue = new RaidSpawnWorkQueue();

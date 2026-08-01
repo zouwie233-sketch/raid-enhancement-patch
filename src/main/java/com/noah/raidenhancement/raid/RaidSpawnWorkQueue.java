@@ -3,6 +3,7 @@ package com.noah.raidenhancement.raid;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,8 @@ import java.util.Set;
  * entity that happened to be behind the per-tick safe-spawn budget.</p>
  */
 public final class RaidSpawnWorkQueue {
+    public static final int SNAPSHOT_FORMAT = 1;
+
     private final Map<String, BatchState> activeBatches = new LinkedHashMap<>();
     private final Set<String> reservedBatchIds = new HashSet<>();
     private final ArrayDeque<PendingSlot> pendingSlots = new ArrayDeque<>();
@@ -115,6 +118,114 @@ public final class RaidSpawnWorkQueue {
 
     public int pendingCount() {
         return pendingSlots.size();
+    }
+
+    /**
+     * Captures only deterministic queue state. Minecraft entities and world objects are
+     * deliberately excluded so the snapshot can be persisted by the raid lifecycle owner.
+     */
+    public QueueSnapshot snapshot() {
+        List<BatchSnapshot> batches = new ArrayList<>(activeBatches.size());
+        for (BatchState state : activeBatches.values()) {
+            batches.add(new BatchSnapshot(state.plan, state.spawned, state.exhausted));
+        }
+        List<PendingSlotSnapshot> pending = new ArrayList<>(pendingSlots.size());
+        for (PendingSlot slot : pendingSlots) {
+            pending.add(new PendingSlotSnapshot(slot.batchId, slot.slot.slotIndex(), slot.attempts));
+        }
+        return new QueueSnapshot(SNAPSHOT_FORMAT, batches, new LinkedHashSet<>(reservedBatchIds), pending, 0);
+    }
+
+    /**
+     * Replaces this queue with a validated snapshot. Invalid batches are rejected as a
+     * whole, preventing a corrupt sidecar from manufacturing partial or duplicate plans.
+     */
+    public RestoreReport restore(QueueSnapshot snapshot) {
+        clear();
+        if (snapshot == null || snapshot.formatVersion() != SNAPSHOT_FORMAT) {
+            return new RestoreReport(0, 0, 1, Set.of());
+        }
+
+        Map<String, BatchSnapshot> candidates = new LinkedHashMap<>();
+        int rejected = snapshot.decodeRejectedBatches();
+        Set<String> rejectedBatchIds = new HashSet<>();
+        for (BatchSnapshot batch : snapshot.activeBatches()) {
+            if (batch == null) {
+                rejected++;
+                continue;
+            }
+            if (candidates.putIfAbsent(batch.plan().batchId(), batch) != null) {
+                rejected++;
+                rejectedBatchIds.add(batch.plan().batchId());
+            }
+        }
+
+        Map<String, List<PendingSlotSnapshot>> pendingByBatch = new LinkedHashMap<>();
+        for (PendingSlotSnapshot pending : snapshot.pendingSlots()) {
+            if (pending != null) {
+                pendingByBatch.computeIfAbsent(pending.batchId(), ignored -> new ArrayList<>()).add(pending);
+            }
+        }
+
+        Set<String> accepted = new HashSet<>();
+        for (BatchSnapshot candidate : candidates.values()) {
+            BatchPlan plan = candidate.plan();
+            List<PendingSlotSnapshot> batchPending = pendingByBatch.getOrDefault(plan.batchId(), List.of());
+            Map<Integer, SpawnSlot> plannedSlots = new LinkedHashMap<>();
+            boolean valid = candidate.spawned() >= 0 && candidate.exhausted() >= 0;
+            for (SpawnSlot slot : plan.slots()) {
+                valid &= plannedSlots.putIfAbsent(slot.slotIndex(), slot) == null;
+            }
+            Set<Integer> pendingIndexes = new HashSet<>();
+            for (PendingSlotSnapshot pending : batchPending) {
+                valid &= pending.attempts() >= 0
+                        && plannedSlots.containsKey(pending.slotIndex())
+                        && pendingIndexes.add(pending.slotIndex());
+            }
+            valid &= !batchPending.isEmpty();
+            valid &= plan.slots().size() == candidate.spawned() + candidate.exhausted() + batchPending.size();
+            if (!valid) {
+                rejected++;
+                rejectedBatchIds.add(plan.batchId());
+                continue;
+            }
+            BatchState restored = new BatchState(plan, candidate.spawned(), candidate.exhausted(), batchPending.size());
+            activeBatches.put(plan.batchId(), restored);
+            accepted.add(plan.batchId());
+        }
+
+        for (PendingSlotSnapshot pending : snapshot.pendingSlots()) {
+            if (pending == null || !accepted.contains(pending.batchId())) {
+                continue;
+            }
+            BatchPlan plan = activeBatches.get(pending.batchId()).plan;
+            SpawnSlot slot = null;
+            for (SpawnSlot candidate : plan.slots()) {
+                if (candidate.slotIndex() == pending.slotIndex()) {
+                    slot = candidate;
+                    break;
+                }
+            }
+            if (slot != null) {
+                pendingSlots.addLast(new PendingSlot(pending.batchId(), slot, pending.attempts()));
+            }
+        }
+
+        for (String reserved : snapshot.reservedBatchIds()) {
+            if (reserved != null && !reserved.isBlank() && !rejectedBatchIds.contains(reserved)) {
+                reservedBatchIds.add(reserved);
+            }
+        }
+        reservedBatchIds.addAll(accepted);
+        return new RestoreReport(activeBatches.size(), pendingSlots.size(), rejected,
+                Set.copyOf(rejectedBatchIds));
+    }
+
+    public void clear() {
+        activeBatches.clear();
+        reservedBatchIds.clear();
+        pendingSlots.clear();
+        completedBatches.clear();
     }
 
     public List<BatchResult> pollCompleted() {
@@ -218,6 +329,37 @@ public final class RaidSpawnWorkQueue {
         }
     }
 
+    public record QueueSnapshot(int formatVersion, List<BatchSnapshot> activeBatches,
+                                Set<String> reservedBatchIds, List<PendingSlotSnapshot> pendingSlots,
+                                int decodeRejectedBatches) {
+        public QueueSnapshot {
+            activeBatches = List.copyOf(activeBatches == null ? List.of() : activeBatches);
+            reservedBatchIds = Set.copyOf(reservedBatchIds == null ? Set.of() : reservedBatchIds);
+            pendingSlots = List.copyOf(pendingSlots == null ? List.of() : pendingSlots);
+            decodeRejectedBatches = Math.max(0, decodeRejectedBatches);
+        }
+
+        public static QueueSnapshot empty() {
+            return new QueueSnapshot(SNAPSHOT_FORMAT, List.of(), Set.of(), List.of(), 0);
+        }
+    }
+
+    public record BatchSnapshot(BatchPlan plan, int spawned, int exhausted) {
+        public BatchSnapshot {
+            Objects.requireNonNull(plan, "plan");
+        }
+    }
+
+    public record PendingSlotSnapshot(String batchId, int slotIndex, int attempts) {
+    }
+
+    public record RestoreReport(int restoredBatches, int restoredPendingSlots, int rejectedBatches,
+                                Set<String> rejectedBatchIds) {
+        public RestoreReport {
+            rejectedBatchIds = Set.copyOf(rejectedBatchIds == null ? Set.of() : rejectedBatchIds);
+        }
+    }
+
     private static final class BatchState {
         private final BatchPlan plan;
         private int pending;
@@ -227,6 +369,13 @@ public final class RaidSpawnWorkQueue {
         private BatchState(BatchPlan plan) {
             this.plan = plan;
             this.pending = plan.slots().size();
+        }
+
+        private BatchState(BatchPlan plan, int spawned, int exhausted, int pending) {
+            this.plan = plan;
+            this.spawned = spawned;
+            this.exhausted = exhausted;
+            this.pending = pending;
         }
     }
 
@@ -238,6 +387,12 @@ public final class RaidSpawnWorkQueue {
         private PendingSlot(String batchId, SpawnSlot slot) {
             this.batchId = batchId;
             this.slot = slot;
+        }
+
+        private PendingSlot(String batchId, SpawnSlot slot, int attempts) {
+            this.batchId = batchId;
+            this.slot = slot;
+            this.attempts = attempts;
         }
     }
 }

@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 /** Dependency-free contract test executed before the NeoForge Gradle build. */
@@ -15,6 +16,9 @@ public final class RaidSpawnWorkQueueContractTest {
     public static void main(String[] args) {
         retriesAllSixtyTwoSlotsWithoutDuplicates();
         exhaustsAndExplicitlyReleasesAPlan();
+        persistsAndRestoresOnlyRemainingSlots();
+        rejectsCorruptPartialBatchSnapshots();
+        readsStableNativeRaidIdentity();
         sharesOneBoundedAdmissionBudgetPerLevelTick();
         System.out.println("[spawn-queue-contract] PASS");
     }
@@ -98,6 +102,78 @@ public final class RaidSpawnWorkQueueContractTest {
                 "level budget did not reset on the next game time");
         check(RaidSpawnTickBudget.claim(new Object(), 100L, 16, 16) == 16,
                 "independent level key did not receive an independent budget");
+    }
+
+    private static void persistsAndRestoresOnlyRemainingSlots() {
+        RaidSpawnWorkQueue queue = new RaidSpawnWorkQueue();
+        List<RaidSpawnWorkQueue.SpawnAnchor> anchors = List.of(
+                new RaidSpawnWorkQueue.SpawnAnchor(0, 64, 0),
+                new RaidSpawnWorkQueue.SpawnAnchor(20, 64, 0));
+        List<RaidSpawnWorkQueue.SpawnSlot> slots = List.of(
+                new RaidSpawnWorkQueue.SpawnSlot(0, "minecraft:pillager", RaiderCategory.VANILLA_MAIN_POINT, 0, 0),
+                new RaidSpawnWorkQueue.SpawnSlot(1, "minecraft:vindicator", RaiderCategory.VANILLA_SIDE_POINT, 0, 1),
+                new RaidSpawnWorkQueue.SpawnSlot(2, "minecraft:ravager", RaiderCategory.VANILLA_MAIN_POINT, 1, 2));
+        RaidSpawnWorkQueue.BatchPlan plan = new RaidSpawnWorkQueue.BatchPlan("custom:11:0", 11, anchors, slots);
+        check(queue.enqueue(plan), "persistence plan must enqueue");
+        queue.drain(2, 12, attempt -> attempt.slotIndex() == 0
+                ? RaidSpawnWorkQueue.AttemptResult.SPAWNED : RaidSpawnWorkQueue.AttemptResult.RETRY);
+
+        Properties properties = new Properties();
+        RaidSpawnQueuePersistenceCodec.write(properties, "test.", queue.snapshot());
+        RaidSpawnWorkQueue.QueueSnapshot decoded = RaidSpawnQueuePersistenceCodec.read(properties, "test.");
+        RaidSpawnWorkQueue restored = new RaidSpawnWorkQueue();
+        RaidSpawnWorkQueue.RestoreReport restore = restored.restore(decoded);
+        check(restore.restoredBatches() == 1, "active batch was not restored");
+        check(restore.restoredPendingSlots() == 2, "completed slot was restored as pending");
+        check(!restored.enqueue(plan), "restored reservation allowed duplicate enqueue");
+
+        Set<Integer> spawnedAfterRestore = new HashSet<>();
+        while (restored.hasPendingWork()) {
+            restored.drain(8, 12, attempt -> {
+                check(attempt.slotIndex() != 0, "already-completed slot was retried after restore");
+                if (attempt.slotIndex() == 1) {
+                    check(attempt.previousAttempts() == 1, "retry count was not restored");
+                    check(attempt.anchor().x() == 20, "anchor rotation did not continue after restore");
+                }
+                check(spawnedAfterRestore.add(attempt.slotIndex()), "restored slot spawned twice");
+                return RaidSpawnWorkQueue.AttemptResult.SPAWNED;
+            });
+        }
+        RaidSpawnWorkQueue.BatchResult result = restored.pollCompleted().getFirst();
+        check(result.planned() == 3 && result.spawned() == 3 && result.exhausted() == 0,
+                "restored batch accounting changed");
+    }
+
+    private static void rejectsCorruptPartialBatchSnapshots() {
+        RaidSpawnWorkQueue queue = new RaidSpawnWorkQueue();
+        RaidSpawnWorkQueue.BatchPlan plan = new RaidSpawnWorkQueue.BatchPlan("special:7", 7,
+                List.of(new RaidSpawnWorkQueue.SpawnAnchor(0, 64, 0)),
+                List.of(
+                        new RaidSpawnWorkQueue.SpawnSlot(0, "minecraft:witch", RaiderCategory.RAIDS_ENHANCED_SPECIAL, 0, 0),
+                        new RaidSpawnWorkQueue.SpawnSlot(1, "minecraft:evoker", RaiderCategory.RAIDS_ENHANCED_SPECIAL, 0, 1)));
+        check(queue.enqueue(plan), "corruption plan must enqueue");
+        Properties properties = new Properties();
+        RaidSpawnQueuePersistenceCodec.write(properties, "corrupt.", queue.snapshot());
+        properties.setProperty("corrupt.pending.1.slotIndex", "0");
+        RaidSpawnWorkQueue restored = new RaidSpawnWorkQueue();
+        RaidSpawnWorkQueue.RestoreReport report = restored.restore(
+                RaidSpawnQueuePersistenceCodec.read(properties, "corrupt."));
+        check(report.rejectedBatches() == 1, "corrupt batch was not rejected");
+        check(!restored.hasPendingWork(), "partial corrupt batch leaked pending work");
+        check(restored.enqueue(plan), "rejected batch reservation blocked a fresh safe plan");
+    }
+
+    private static void readsStableNativeRaidIdentity() {
+        check(Integer.valueOf(42).equals(RaidKeyService.nativeRaidNumericId(new FakeRaid(42))),
+                "stable native raid id was not readable");
+        check(RaidKeyService.nativeRaidNumericId(new Object()) == null,
+                "missing native raid id did not fail closed");
+    }
+
+    public record FakeRaid(int id) {
+        public int getId() {
+            return id;
+        }
     }
 
     private static void check(boolean condition, String message) {

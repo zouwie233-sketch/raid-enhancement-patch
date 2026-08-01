@@ -159,7 +159,8 @@ public final class RaidKeyService {
                 : "id:" + id + "/identity:" + System.identityHashCode(nativeRaid);
     }
 
-    private static Integer nativeRaidNumericId(Object nativeRaid) {
+    /** Stable vanilla raid identity used by persistence owners; null when unavailable. */
+    public static Integer nativeRaidNumericId(Object nativeRaid) {
         for (String methodName : java.util.List.of("getId", "getRaidId", "id")) {
             try {
                 java.lang.reflect.Method method = nativeRaid.getClass().getMethod(methodName);

@@ -10,11 +10,11 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * Static configuration defaults plus a lightweight file loader for stage 0.8.9.6.
+ * Static configuration defaults plus lightweight, server-owned properties loaders.
  *
- * Only the village-security layer is runtime-configurable in this stage. Older
- * raid expansion, HUD and extra-wave values remain fixed to avoid destabilizing
- * the tested bridge/return logic. Stage 0.8.9.6 keeps the hotfix baseline, then adds configurable battlefield deployment doctrine for village-security golems.
+ * Village security and bounded spawn-queue execution have separate files. Wave
+ * composition, rewards, HUD and bridge rules remain fixed to protect the tested
+ * gameplay contract.
  */
 public final class RaidEnhancementConfig {
     private RaidEnhancementConfig() {
@@ -293,9 +293,12 @@ public final class RaidEnhancementConfig {
     // only a small number of slots are attempted on each server tick. Failed safe
     // positions rotate across the planned anchors instead of discarding the rest of
     // a partially successful high-omen wave.
-    public static final int RAID_SPAWN_QUEUE_MAX_SLOTS_PER_TICK = 8;
-    public static final int RAID_SPAWN_QUEUE_GLOBAL_MAX_SLOTS_PER_LEVEL_TICK = 16;
-    public static final int RAID_SPAWN_QUEUE_MAX_ATTEMPTS_PER_SLOT = 12;
+    public static int RAID_SPAWN_QUEUE_MAX_SLOTS_PER_TICK = 8;
+    public static int RAID_SPAWN_QUEUE_GLOBAL_MAX_SLOTS_PER_LEVEL_TICK = 16;
+    public static int RAID_SPAWN_QUEUE_MAX_ATTEMPTS_PER_SLOT = 12;
+    public static boolean RAID_SPAWN_QUEUE_PERSISTENCE_ENABLED = true;
+    public static boolean RAID_SPAWN_QUEUE_BATCH_DIAGNOSTICS_ENABLED = true;
+    public static final String RAID_SPAWN_QUEUE_CONFIG_FILE = "raid_spawn_queue.properties";
 
     // Step 5 preview: only the custom extra waves use multi-spawn points.
     // Vanilla native waves 1-8 remain untouched. Each point is still a small
@@ -341,10 +344,9 @@ public final class RaidEnhancementConfig {
     public static final int RAID_WAVE_HUD_CLIENT_STALE_TICKS = 120;
     public static final boolean RAID_WAVE_HUD_SELECT_NEAREST_RAID = true;
 
-    // Step 8.5: lightweight lifecycle recovery. This sidecar file is intentionally
-    // conservative: it only restores stable session metadata such as difficulty,
-    // omen level, total waves and extra-wave progress. It does not restore mobs,
-    // teleport anything, clear anything, or mutate the vanilla Raid failure state.
+    // Step 8.5 / 0.9.1.11: lifecycle recovery. The sidecar restores stable session
+    // metadata and, when enabled, validated remaining queue slots. It never serializes
+    // entities, loads chunks, teleports mobs, clears terrain or mutates raid failure.
     public static final boolean RAID_SESSION_LIFECYCLE_PERSISTENCE_ENABLED = true;
     public static final int RAID_SESSION_LIFECYCLE_PERSIST_INTERVAL_TICKS = 200;
     public static final int RAID_SESSION_LIFECYCLE_RESTORE_TTL_TICKS = 24000;
@@ -388,6 +390,7 @@ public final class RaidEnhancementConfig {
 
     public static void loadOrCreate() {
         Path configDir = Path.of("config", "raid_enhancement_patch");
+        loadRaidSpawnQueueConfig(configDir);
         Path configFile = configDir.resolve("village_security.properties");
         try {
             Files.createDirectories(configDir);
@@ -492,6 +495,66 @@ public final class RaidEnhancementConfig {
                     + ", debug=" + VILLAGE_SECURITY_DEBUG_LOGS_ENABLED + ".");
         } catch (Throwable throwable) {
             System.out.println("[Raid Enhancement Patch] Village security config load failed; using built-in defaults: " + throwable);
+        }
+    }
+
+    private static void loadRaidSpawnQueueConfig(Path configDir) {
+        Path configFile = configDir.resolve(RAID_SPAWN_QUEUE_CONFIG_FILE);
+        try {
+            Files.createDirectories(configDir);
+            if (!Files.exists(configFile)) {
+                writeDefaultRaidSpawnQueueConfig(configFile);
+                System.out.println("[Raid Enhancement Patch] Created bounded spawn queue config: "
+                        + configFile.toAbsolutePath());
+            }
+            Properties properties = new Properties();
+            try (InputStreamReader reader = new InputStreamReader(
+                    Files.newInputStream(configFile), StandardCharsets.UTF_8)) {
+                properties.load(reader);
+            }
+            RAID_SPAWN_QUEUE_MAX_SLOTS_PER_TICK = readInt(properties, "maxSlotsPerRaidPerTick",
+                    RAID_SPAWN_QUEUE_MAX_SLOTS_PER_TICK, 1, 32);
+            RAID_SPAWN_QUEUE_GLOBAL_MAX_SLOTS_PER_LEVEL_TICK = readInt(properties,
+                    "maxSlotsPerLevelPerTick", RAID_SPAWN_QUEUE_GLOBAL_MAX_SLOTS_PER_LEVEL_TICK, 1, 128);
+            RAID_SPAWN_QUEUE_GLOBAL_MAX_SLOTS_PER_LEVEL_TICK = Math.max(
+                    RAID_SPAWN_QUEUE_MAX_SLOTS_PER_TICK,
+                    RAID_SPAWN_QUEUE_GLOBAL_MAX_SLOTS_PER_LEVEL_TICK);
+            RAID_SPAWN_QUEUE_MAX_ATTEMPTS_PER_SLOT = readInt(properties, "maxAttemptsPerSlot",
+                    RAID_SPAWN_QUEUE_MAX_ATTEMPTS_PER_SLOT, 1, 64);
+            RAID_SPAWN_QUEUE_PERSISTENCE_ENABLED = readBool(properties, "persistence.enabled",
+                    RAID_SPAWN_QUEUE_PERSISTENCE_ENABLED);
+            RAID_SPAWN_QUEUE_BATCH_DIAGNOSTICS_ENABLED = readBool(properties, "diagnostics.batchCompletion",
+                    RAID_SPAWN_QUEUE_BATCH_DIAGNOSTICS_ENABLED);
+            writeDefaultRaidSpawnQueueConfig(configDir.resolve("raid_spawn_queue.default.properties"));
+            System.out.println("[Raid Enhancement Patch] Loaded bounded spawn queue config: perRaid="
+                    + RAID_SPAWN_QUEUE_MAX_SLOTS_PER_TICK + ", perLevel="
+                    + RAID_SPAWN_QUEUE_GLOBAL_MAX_SLOTS_PER_LEVEL_TICK + ", attempts="
+                    + RAID_SPAWN_QUEUE_MAX_ATTEMPTS_PER_SLOT + ", persistence="
+                    + RAID_SPAWN_QUEUE_PERSISTENCE_ENABLED + ".");
+        } catch (Throwable throwable) {
+            System.out.println("[Raid Enhancement Patch] Bounded spawn queue config load failed; using safe defaults: "
+                    + throwable);
+        }
+    }
+
+    private static void writeDefaultRaidSpawnQueueConfig(Path file) throws IOException {
+        List<String> lines = List.of(
+                "# Raid Enhancement Patch - bounded raid spawn queue",
+                "# Restart the game/server after editing.",
+                "# Values are clamped in code: perRaid 1..32, perLevel 1..128, attempts 1..64.",
+                "# The global limit is never allowed below the per-raid limit.",
+                "maxSlotsPerRaidPerTick=8",
+                "maxSlotsPerLevelPerTick=16",
+                "maxAttemptsPerSlot=12",
+                "persistence.enabled=true",
+                "diagnostics.batchCompletion=true"
+        );
+        try (OutputStreamWriter writer = new OutputStreamWriter(
+                Files.newOutputStream(file), StandardCharsets.UTF_8)) {
+            for (String line : lines) {
+                writer.write(line);
+                writer.write(System.lineSeparator());
+            }
         }
     }
 
