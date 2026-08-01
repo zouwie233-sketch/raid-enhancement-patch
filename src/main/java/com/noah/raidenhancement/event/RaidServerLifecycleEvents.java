@@ -3,7 +3,9 @@ package com.noah.raidenhancement.event;
 import com.noah.raidenhancement.raid.RaidExtraWaveController;
 import com.noah.raidenhancement.raid.RaidEncounterAuthority;
 import com.noah.raidenhancement.raid.RaidSessionManager;
+import com.noah.raidenhancement.runtime.RaidRuntimeRegistry;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
@@ -17,14 +19,28 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
  */
 public final class RaidServerLifecycleEvents {
     @SubscribeEvent
+    public void onServerStarting(ServerStartingEvent event) {
+        RaidRuntimeRegistry.start(event.getServer());
+    }
+
+    @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
-        RaidExtraWaveController.checkpointBeforeServerStop();
+        RaidRuntimeRegistry.beginStopping(event.getServer());
+        try {
+            RaidExtraWaveController.checkpointBeforeServerStop();
+        } finally {
+            RaidRuntimeRegistry.checkpoint(event.getServer());
+        }
     }
 
     @SubscribeEvent
     public void onServerStopped(ServerStoppedEvent event) {
-        RaidExtraWaveController.clearRuntimeStateAfterServerStop();
-        RaidEncounterAuthority.clearRuntimeStateAfterServerStop();
-        RaidSessionManager.clearRuntimeStateAfterServerStop();
+        try {
+            RaidExtraWaveController.clearRuntimeStateAfterServerStop();
+            RaidEncounterAuthority.clearRuntimeStateAfterServerStop();
+            RaidSessionManager.clearRuntimeStateAfterServerStop();
+        } finally {
+            RaidRuntimeRegistry.close(event.getServer());
+        }
     }
 }

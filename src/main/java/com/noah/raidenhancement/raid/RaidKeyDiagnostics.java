@@ -5,6 +5,8 @@ import com.noah.raidenhancement.config.ConfigAuditService;
 import com.noah.raidenhancement.favor.VillageFavorGatewayAudit;
 import com.noah.raidenhancement.favor.VillageFavorRecord;
 import com.noah.raidenhancement.favor.VillageFavorState;
+import com.noah.raidenhancement.runtime.RaidDiagnosticsContext;
+import com.noah.raidenhancement.runtime.RaidRuntimeRegistry;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import org.slf4j.Logger;
@@ -18,9 +20,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -33,9 +33,7 @@ import java.util.UUID;
  */
 public final class RaidKeyDiagnostics {
     private static final Logger LOGGER = LoggerFactory.getLogger("RaidEnhancementPatchKeyDiag");
-    private static final Map<String, Long> LAST_LOG_BY_EVENT_AND_KEY = new LinkedHashMap<>();
     private static boolean warnedFileOutput;
-    private static boolean warnedVictorySettlementBoundaryAudit;
 
     private RaidKeyDiagnostics() {
     }
@@ -74,7 +72,7 @@ public final class RaidKeyDiagnostics {
         if (!KeyDiagnosticsConfig.ENABLED || !KeyDiagnosticsConfig.LOG_RAID_DISCOVERY) {
             return;
         }
-        if (!shouldLog("raid-discovery:" + phase, stateKey, gameTime)) {
+        if (!shouldLog(level, "raid-discovery:" + phase, stateKey, gameTime)) {
             return;
         }
         String villageKey = villageKey(dimensionId, centerX, centerY, centerZ);
@@ -134,12 +132,13 @@ public final class RaidKeyDiagnostics {
                 raidInstanceCandidate, villageKey, settlement, "listed-in-eligiblePlayerFavorKeys")
                 + " completedGameTime=" + gameTime
                 + " levelDimension=" + dimensionId(level) + ".");
-        logVictorySettlementBoundary(phase, dimensionId, centerX, centerY, centerZ,
+        logVictorySettlementBoundary(level, phase, dimensionId, centerX, centerY, centerZ,
                 raidInstanceCandidate, villageKey, settlementKeyMode, gameTime,
                 omenLevel, totalWaves, eligiblePlayers);
     }
 
-    private static void logVictorySettlementBoundary(String phase,
+    private static void logVictorySettlementBoundary(ServerLevel level,
+                                                      String phase,
                                                       String dimensionId,
                                                       int centerX,
                                                       int centerY,
@@ -177,8 +176,8 @@ public final class RaidKeyDiagnostics {
                             settlementKeyMode
                     ));
         } catch (Throwable throwable) {
-            if (!warnedVictorySettlementBoundaryAudit) {
-                warnedVictorySettlementBoundaryAudit = true;
+            RaidDiagnosticsContext diagnostics = diagnostics(level);
+            if (diagnostics == null || diagnostics.warnOnce("victory-settlement-boundary-audit")) {
                 LOGGER.warn("[Raid Enhancement Patch][KeyDiag][victory-settlement-boundary] audit projection failed once and was suppressed: {}",
                         throwable.toString());
             }
@@ -307,7 +306,7 @@ public final class RaidKeyDiagnostics {
             return;
         }
         String logKey = snapshot.key() + ":" + phase + ":" + snapshot.currentWave() + ":" + waveChange + ":" + refillAttempt + ":" + baselineRaiders + ":" + alive + ":" + countSource;
-        if (!waveChange && !refillAttempt && !progressApplied && !shouldLog("bossbar:" + phase, logKey, gameTime)) {
+        if (!waveChange && !refillAttempt && !progressApplied && !shouldLog(serverLevel, "bossbar:" + phase, logKey, gameTime)) {
             return;
         }
         emit("bossbar", "phase=" + safe(phase)
@@ -352,7 +351,7 @@ public final class RaidKeyDiagnostics {
             return;
         }
         String key = file == null ? "null" : file.toString();
-        if (!shouldLog("favor-storage", key, 0L)) {
+        if (!shouldLog(level, "favor-storage", key, 0L)) {
             return;
         }
         emit("favor-storage", "source=" + (fallback ? "config-fallback" : "world-data")
@@ -449,24 +448,17 @@ public final class RaidKeyDiagnostics {
         return List.copyOf(result);
     }
 
-    private static boolean shouldLog(String event, String key, long gameTime) {
-        String mapKey = safe(event) + "|" + safe(key);
-        long interval = Math.max(20L, KeyDiagnosticsConfig.LOG_INTERVAL_TICKS);
-        Long previous = LAST_LOG_BY_EVENT_AND_KEY.get(mapKey);
-        if (previous != null && gameTime >= 0L && previous >= 0L && gameTime - previous < interval) {
-            return false;
+    private static boolean shouldLog(Object level, String event, String key, long gameTime) {
+        RaidDiagnosticsContext diagnostics = diagnostics(level);
+        return diagnostics == null
+                || diagnostics.shouldLog(event, key, gameTime, KeyDiagnosticsConfig.LOG_INTERVAL_TICKS);
+    }
+
+    private static RaidDiagnosticsContext diagnostics(Object level) {
+        if (!(level instanceof ServerLevel serverLevel) || serverLevel.getServer() == null) {
+            return null;
         }
-        LAST_LOG_BY_EVENT_AND_KEY.put(mapKey, gameTime);
-        if (LAST_LOG_BY_EVENT_AND_KEY.size() > 512) {
-            int toRemove = Math.max(1, LAST_LOG_BY_EVENT_AND_KEY.size() - 384);
-            for (String oldest : List.copyOf(LAST_LOG_BY_EVENT_AND_KEY.keySet())) {
-                LAST_LOG_BY_EVENT_AND_KEY.remove(oldest);
-                if (--toRemove <= 0) {
-                    break;
-                }
-            }
-        }
-        return true;
+        return RaidRuntimeRegistry.require(serverLevel).diagnostics();
     }
 
     private static String dimensionId(Object level) {

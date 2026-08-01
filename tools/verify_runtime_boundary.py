@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static architecture and raid registration contracts for 0.9.1.12."""
+"""Static architecture and raid registration contracts for 0.9.2.0."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 JAVA_ROOT = ROOT / "src/main/java/com/noah/raidenhancement"
-EXPECTED_VERSION = "0.9.1.12-raid-registration-lifecycle-hotfix"
+EXPECTED_VERSION = "0.9.2.0-architecture-runtime-context-alpha"
 
 
 def require(condition: bool, message: str) -> None:
@@ -129,6 +129,13 @@ def verify_registration_and_server_lifecycle() -> None:
             "server lifecycle listener is not registered")
     require("ServerStoppingEvent" in lifecycle and "checkpointBeforeServerStop();" in lifecycle,
             "stopping event does not checkpoint active queues")
+    require("ServerStartingEvent" in lifecycle and "RaidRuntimeRegistry.start(event.getServer());" in lifecycle,
+            "starting event does not create the server-scoped runtime context")
+    require("RaidRuntimeRegistry.beginStopping(event.getServer());" in lifecycle
+            and "RaidRuntimeRegistry.checkpoint(event.getServer());" in lifecycle,
+            "stopping event does not drive the runtime context lifecycle")
+    require("RaidRuntimeRegistry.close(event.getServer());" in lifecycle,
+            "stopped event does not remove the server-scoped runtime context")
     require("ServerStoppedEvent" in lifecycle and "clearRuntimeStateAfterServerStop();" in lifecycle,
             "stopped event does not clear process-local raid state")
     require("RaidSessionManager.clearRuntimeStateAfterServerStop();" in lifecycle
@@ -144,6 +151,26 @@ def verify_registration_and_server_lifecycle() -> None:
         require(runtime_clear in controller, f"server-stop runtime reset missing: {runtime_clear}")
 
 
+def verify_server_scoped_context() -> None:
+    registry = text(JAVA_ROOT / "runtime/RaidRuntimeRegistry.java")
+    context = text(JAVA_ROOT / "runtime/RaidRuntimeContext.java")
+    diagnostics = text(JAVA_ROOT / "runtime/RaidDiagnosticsContext.java")
+    store = text(JAVA_ROOT / "runtime/ServerScopedContextStore.java")
+    key_diagnostics = text(JAVA_ROOT / "raid/RaidKeyDiagnostics.java")
+    require("IdentityHashMap" in store and "closeAndRemove" in store,
+            "server context store is not identity-scoped or explicitly removable")
+    require("ServerScopedContextStore<MinecraftServer, RaidRuntimeContext>" in registry,
+            "runtime registry is not scoped by concrete MinecraftServer")
+    require("RaidDiagnosticsContext diagnostics" in context and "diagnostics.close();" in context,
+            "runtime context does not own and release diagnostic state")
+    require("MAX_RATE_LIMIT_ENTRIES = 512" in diagnostics and "lastLogByEventAndKey.clear();" in diagnostics,
+            "diagnostic state is not bounded or cleared")
+    require("RaidRuntimeRegistry.require(serverLevel).diagnostics()" in key_diagnostics,
+            "key diagnostics still bypasses the server-scoped diagnostic owner")
+    require("LAST_LOG_BY_EVENT_AND_KEY" not in key_diagnostics,
+            "legacy process-global key diagnostic rate-limit map remains")
+
+
 def main() -> None:
     verify_versions()
     verify_single_tick_entrypoint()
@@ -152,8 +179,9 @@ def main() -> None:
     verify_no_removed_bridges()
     verify_bounded_spawn_queue()
     verify_registration_and_server_lifecycle()
+    verify_server_scoped_context()
     java_count = sum(1 for _ in JAVA_ROOT.rglob("*.java"))
-    require(java_count == 88, f"unexpected top-level Java source count: {java_count}")
+    require(java_count == 92, f"unexpected top-level Java source count: {java_count}")
     print(f"[runtime-boundary] PASS: version={EXPECTED_VERSION}, javaSources={java_count}")
 
 

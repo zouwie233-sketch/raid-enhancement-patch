@@ -1,8 +1,8 @@
 # Raid Enhancement Patch
 
-Current version: `0.9.1.12-raid-registration-lifecycle-hotfix`
+Current version: `0.9.2.0-architecture-runtime-context-alpha`
 
-0.9.1.12 keeps the tested bounded persistent queue but fixes the ground-raider commit path: the entity enters the world exactly once, then vanilla `Raid#joinRaid` performs membership-only registration. The server stopping event checkpoints active batches, and the stopped event clears process-local raid/session/read-model mirrors so a later integrated-server start must validate and restore the sidecar. Existing safe-position validation remains authoritative.
+0.9.2.0 begins the approved architecture roadmap with a server-scoped runtime lifecycle boundary. A concrete `MinecraftServer` now owns one `RaidRuntimeContext`; the first migrated state is diagnostic-only so the tested raid wave, queue, registration, safe-spawn, BossBar, settlement and VillageFavor behavior stays unchanged. Starting, stopping, checkpoint and close transitions are explicit, and the diagnostic rate-limit map no longer crosses integrated-server sessions.
 
 It introduces one server-level tick coordinator and immutable runtime views for BossBar and battle-support consumers. It removes internal reflection into `RaidExtraWaveController.STATES` and `VillageSecurityController.SESSIONS` without changing gameplay rules.
 

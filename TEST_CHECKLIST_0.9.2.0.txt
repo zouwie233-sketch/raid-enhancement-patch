@@ -1,0 +1,30 @@
+Raid Enhancement Patch 0.9.2.0 ARCH-1.1 测试清单
+
+[GitHub 构建]
+[ ] Verify runtime architecture boundary: PASS
+[ ] Test bounded spawn queue contract: PASS
+[ ] Test server-scoped runtime context contract: PASS
+[ ] Gradle clean build: PASS
+[ ] 成功生成 raid_enhancement_patch-0.9.2.0-architecture-runtime-context-alpha.jar
+
+[启动和生命周期]
+[ ] 使用原测试存档进入游戏，无启动异常
+[ ] 日志显示 0.9.2.0-architecture-runtime-context-alpha
+[ ] 正常退出到主菜单后再次进入同一存档，无旧 Context 相关异常
+[ ] 连续进入第二个不同存档，无旧 Raid/BossBar/诊断限流串入
+[ ] 再返回第一个存档，Mod 功能仍正常
+
+[核心玩法回归]
+[ ] 困难模式 + 不祥之兆 V 的目标波数保持原样
+[ ] 原版波次和额外连续波次正常生成
+[ ] 最终连续波次首批袭击者出现后退出主菜单
+[ ] 重新进入同一存档后待生成队列正常恢复
+[ ] 无漏刷、重复刷、UUID 重复或提前胜利
+[ ] 安全生成仍阻止墙体、流体、无支撑和未加载区块位置
+[ ] BossBar、结算、奖励和 VillageFavor 行为无变化
+
+[日志重点]
+[ ] 无 RaidRuntimeContext is closed
+[ ] 无 ServerScopedContext 关闭异常
+[ ] 无 NeoForge 事件方法签名/监听器注册异常
+[ ] 无新增高频诊断日志

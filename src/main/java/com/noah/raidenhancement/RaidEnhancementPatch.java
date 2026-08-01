@@ -22,13 +22,13 @@ import net.neoforged.fml.common.Mod;
 /**
  * NeoForge entrypoint for the independent raid enhancement patch.
  *
- * <p>0.9.1.12 registers already-inserted raiders without asking vanilla to insert
- * them a second time and resets process-local raid state after server shutdown.</p>
+ * <p>0.9.2.0 introduces a server-scoped runtime lifecycle boundary while preserving
+ * the validated 0.9.1.12 raid registration and queue recovery behavior.</p>
  */
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.12-raid-registration-lifecycle-hotfix";
+    public static final String VERSION = "0.9.2.0-architecture-runtime-context-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -50,7 +50,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Patch-owned raiders use one world insertion followed by raid-only registration, and process-local raid state is cleared after server shutdown so persisted queue recovery is authoritative. " + GolemBlockRollbackGuard.hotfixMarker() + ". Safe-position authority, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor and Mixin enablement are unchanged.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". ARCH-1.1 server-scoped runtime context is active for lifecycle ownership and diagnostic isolation. Patch-owned raider registration, queue recovery, safe-position authority, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor and Mixin enablement are unchanged. " + GolemBlockRollbackGuard.hotfixMarker() + ".");
     }
 
     /**
