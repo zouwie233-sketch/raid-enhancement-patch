@@ -1,0 +1,31 @@
+Raid Enhancement Patch 0.9.1.12 registration/lifecycle hotfix checklist
+
+[BUILD]
+[ ] GitHub Actions static and bounded queue contracts pass
+[ ] Gradle clean build passes on Java 21
+[ ] Built JAR reports 0.9.1.12-raid-registration-lifecycle-hotfix
+
+[DUPLICATE INSERTION REGRESSION]
+[ ] Start a Hard Omen V raid and keep latest.log open
+[ ] Ground raider batches reach planned totals
+[ ] No new "UUID of added entity already exists" appears for patch batches
+[ ] Raiders remain attached to the native raid and count on the raid BossBar
+[ ] Ravagers retain passengers and ordinary/special raiders retain expected AI
+
+[SAME-PROCESS INTEGRATED SERVER RESTART]
+[ ] During a pending wave 11 batch, use Save and Quit to Title
+[ ] Confirm raid_session_lifecycle.properties still contains the pending queue
+[ ] Re-enter the same world without closing the Minecraft process
+[ ] One "Restored bounded spawn queue" summary appears
+[ ] Only remaining slots spawn and final accounting reaches the planned total
+
+[FULL PROCESS RESTART]
+[ ] Repeat the pending wave test, then close Minecraft completely
+[ ] Relaunch and confirm the same validated restore behavior
+[ ] A new raid at the same village does not inherit old pending work
+
+[SAFETY REGRESSION]
+[ ] Loaded-chunk, border, collision, fluid, hazard and support checks still apply
+[ ] No terrain is broken and no chunk is force-loaded
+[ ] Leaving the battlefield still pauses queued execution
+[ ] No extra entity scan or tick listener appears in profiler results

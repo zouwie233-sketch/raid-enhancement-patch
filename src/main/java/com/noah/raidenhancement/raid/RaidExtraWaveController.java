@@ -142,6 +142,40 @@ public final class RaidExtraWaveController {
         return STATES.get(key);
     }
 
+    /**
+     * Persists every active bounded queue before NeoForge tears down the server.
+     * This is event-driven and does not add work to the normal tick path.
+     */
+    public static void checkpointBeforeServerStop() {
+        ensureLifecycleSnapshotsLoaded();
+        long latestGameTime = 0L;
+        for (ExtraWaveState state : STATES.values()) {
+            if (state == null || state.completed) {
+                continue;
+            }
+            latestGameTime = Math.max(latestGameTime, state.lastSeenGameTime);
+            persistLifecycleSnapshot(state, state.lastSeenGameTime, true);
+        }
+        if (lifecycleSnapshotsDirty) {
+            saveLifecycleSnapshots(latestGameTime);
+        }
+    }
+
+    /**
+     * Drops only process-local raid mirrors after the server has fully stopped.
+     * Persisted lifecycle metadata remains on disk for validation on the next start.
+     */
+    public static void clearRuntimeStateAfterServerStop() {
+        STATES.clear();
+        TERMINATED_RAID_KEYS.clear();
+        LAST_HUD_SNAPSHOTS.clear();
+        lastHudSnapshot = null;
+        PERSISTED_LIFECYCLE_SNAPSHOTS.clear();
+        lifecycleSnapshotsLoaded = false;
+        lifecycleSnapshotsDirty = false;
+        lifecyclePersistenceRetryNotBeforeGameTime = 0L;
+    }
+
     public static void tick(ServerLevel level) {
         if (!RaidEnhancementConfig.EXTRA_WAVE_LAYER_ENABLED || level == null) {
             return;
@@ -2645,7 +2679,9 @@ public final class RaidExtraWaveController {
             // Vanilla-raider entities created through EntityType#create do not
             // automatically receive spawn equipment or raid AI. Finalize only after
             // the final safe position is known; join the Raid after world insertion
-            // so a failed insertion cannot leave a ghost wave member.
+            // so a failed insertion cannot leave a ghost wave member. The join call
+            // must use the already-spawned flag so vanilla only registers membership
+            // and never attempts a second addFreshEntityWithPassengers call.
             if (RaidEnhancementConfig.EXTRA_WAVE_FINALIZE_SPAWN) {
                 finalizeSpawnIfPossible(entity, level, blockPos);
             }
@@ -2814,7 +2850,7 @@ public final class RaidExtraWaveController {
                     continue;
                 }
                 method.setAccessible(true);
-                method.invoke(state.nativeRaid, safeWave, entity, blockPos, false);
+                method.invoke(state.nativeRaid, safeWave, entity, blockPos, true);
                 return;
             }
             // Compatibility fallback if joinRaid mapping is unavailable: give the raider a
@@ -4223,7 +4259,7 @@ public final class RaidExtraWaveController {
             properties.setProperty("keys", keys.toString());
             Path tempFile = file.resolveSibling(file.getFileName() + ".tmp");
             try (OutputStream outputStream = Files.newOutputStream(tempFile)) {
-                properties.store(outputStream, "Raid Enhancement Patch 0.9.1.11 raid lifecycle and spawn queue metadata");
+                properties.store(outputStream, "Raid Enhancement Patch 0.9.1.12 raid lifecycle and spawn queue metadata");
             }
             try {
                 Files.move(tempFile, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);

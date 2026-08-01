@@ -88,6 +88,10 @@ public final class RaidSessionManager {
     }
 
     public static void clearAllForDebug() {
+        clearRuntimeStateAfterServerStop();
+    }
+
+    public static void clearRuntimeStateAfterServerStop() {
         ACTIVE_SESSIONS.clear();
     }
 }

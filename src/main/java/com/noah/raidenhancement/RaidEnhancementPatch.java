@@ -10,6 +10,7 @@ import com.noah.raidenhancement.event.VillagerProtectionEvents;
 import com.noah.raidenhancement.event.BattleSupportEvents;
 import com.noah.raidenhancement.event.VillageFavorEvents;
 import com.noah.raidenhancement.event.RaidTickCoordinator;
+import com.noah.raidenhancement.event.RaidServerLifecycleEvents;
 import com.noah.raidenhancement.raid.RaidSessionManager;
 import com.noah.raidenhancement.raid.RaidKeyDiagnostics;
 import com.noah.raidenhancement.raid.GolemBlockRollbackGuard;
@@ -21,13 +22,13 @@ import net.neoforged.fml.common.Mod;
 /**
  * NeoForge entrypoint for the independent raid enhancement patch.
  *
- * <p>0.9.1.11 checkpoints the bounded spawn queue into the existing raid lifecycle
- * sidecar and restores only validated remaining slots after a server restart.</p>
+ * <p>0.9.1.12 registers already-inserted raiders without asking vanilla to insert
+ * them a second time and resets process-local raid state after server shutdown.</p>
  */
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.1.11-raid-spawn-persistence-beta";
+    public static final String VERSION = "0.9.1.12-raid-registration-lifecycle-hotfix";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -41,6 +42,7 @@ public final class RaidEnhancementPatch {
         RaidSessionManager.bootstrap();
         VillagerProtectionController.bootstrap();
         registerNeoForgeEventBus(new RaidTickCoordinator());
+        registerNeoForgeEventBus(new RaidServerLifecycleEvents());
         registerNeoForgeEventBus(new VillagerProtectionEvents());
         registerNeoForgeEventBus(new BattleSupportEvents());
         registerNeoForgeEventBus(new VillageFavorEvents());
@@ -48,7 +50,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Bounded spawn batches now checkpoint remaining slots into raid lifecycle metadata and recover validated work after restart. " + GolemBlockRollbackGuard.hotfixMarker() + ". Safe-position authority, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor and Mixin enablement are unchanged.");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". Patch-owned raiders use one world insertion followed by raid-only registration, and process-local raid state is cleared after server shutdown so persisted queue recovery is authoritative. " + GolemBlockRollbackGuard.hotfixMarker() + ". Safe-position authority, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor and Mixin enablement are unchanged.");
     }
 
     /**

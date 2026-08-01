@@ -1,8 +1,8 @@
 # Current Project Build Info
 
-Current stage: bounded spawn-queue restart persistence beta.
+Current stage: raid registration and server lifecycle hotfix.
 
-Current delivery: `0.9.1.11-raid-spawn-persistence-beta`
+Current delivery: `0.9.1.12-raid-registration-lifecycle-hotfix`
 
 Direct source baseline: `0.9.1.8-safe-spawn-validation-alpha`.
 
@@ -10,7 +10,7 @@ Behavior comparison baseline: user-tested `0.9.1.8-safe-spawn-validation-alpha` 
 
 Emergency safety anchor: `0.9.1.0-victory-bar-attach-guard-alpha`.
 
-0.9.1.11 retains the centralized LevelTickEvent coordinator and immutable runtime views. Active bounded spawn plans now checkpoint their remaining slots, retry counters, anchors, accounting and reservations into the existing lifecycle sidecar and validate them before restart recovery.
+0.9.1.12 retains the centralized LevelTickEvent coordinator and immutable runtime views. Ground raiders now use one authoritative world insertion followed by membership-only native raid registration. Active bounded plans are checkpointed at server stopping, and process-local raid/session/read-model state is discarded after stop so same-process integrated-server restarts exercise the persisted recovery path.
 
 Wave composition, safe-position rules and enabled Mixins remain unchanged. The lifecycle persistence format is extended compatibly: older sidecars contain no queue section and restore as an empty queue. Bounded queue limits use a separate clamped server properties file.
 

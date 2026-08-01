@@ -52,6 +52,10 @@ public final class RaidEncounterAuthority {
         });
     }
 
+    public static void clearRuntimeStateAfterServerStop() {
+        SNAPSHOTS.clear();
+    }
+
     public static String title(String key, long gameTime) {
         RaidEncounterSnapshot snapshot = get(key);
         return snapshot == null ? null : RaidBossbarTitleFormatter.format(snapshot, gameTime);

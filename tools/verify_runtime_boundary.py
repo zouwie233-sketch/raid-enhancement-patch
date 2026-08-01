@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static architecture and persistent bounded-spawn contracts for 0.9.1.11."""
+"""Static architecture and raid registration contracts for 0.9.1.12."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 JAVA_ROOT = ROOT / "src/main/java/com/noah/raidenhancement"
-EXPECTED_VERSION = "0.9.1.11-raid-spawn-persistence-beta"
+EXPECTED_VERSION = "0.9.1.12-raid-registration-lifecycle-hotfix"
 
 
 def require(condition: bool, message: str) -> None:
@@ -121,6 +121,29 @@ def verify_bounded_spawn_queue() -> None:
         require(safety_check in resolver, f"safe-spawn check disappeared: {safety_check}")
 
 
+def verify_registration_and_server_lifecycle() -> None:
+    entrypoint = text(JAVA_ROOT / "RaidEnhancementPatch.java")
+    lifecycle = text(JAVA_ROOT / "event/RaidServerLifecycleEvents.java")
+    controller = text(JAVA_ROOT / "raid/RaidExtraWaveController.java")
+    require("new RaidServerLifecycleEvents()" in entrypoint,
+            "server lifecycle listener is not registered")
+    require("ServerStoppingEvent" in lifecycle and "checkpointBeforeServerStop();" in lifecycle,
+            "stopping event does not checkpoint active queues")
+    require("ServerStoppedEvent" in lifecycle and "clearRuntimeStateAfterServerStop();" in lifecycle,
+            "stopped event does not clear process-local raid state")
+    require("RaidSessionManager.clearRuntimeStateAfterServerStop();" in lifecycle
+            and "RaidEncounterAuthority.clearRuntimeStateAfterServerStop();" in lifecycle,
+            "stopped event leaves raid session/read-model state in the old server process")
+    require("method.invoke(state.nativeRaid, safeWave, entity, blockPos, true);" in controller,
+            "already-inserted raiders are not using raid-only registration")
+    require("method.invoke(state.nativeRaid, safeWave, entity, blockPos, false);" not in controller,
+            "duplicate world-insertion joinRaid call remains")
+    for runtime_clear in ["STATES.clear()", "TERMINATED_RAID_KEYS.clear()",
+                          "LAST_HUD_SNAPSHOTS.clear()", "PERSISTED_LIFECYCLE_SNAPSHOTS.clear()",
+                          "lifecycleSnapshotsLoaded = false"]:
+        require(runtime_clear in controller, f"server-stop runtime reset missing: {runtime_clear}")
+
+
 def main() -> None:
     verify_versions()
     verify_single_tick_entrypoint()
@@ -128,8 +151,9 @@ def main() -> None:
     verify_mixins()
     verify_no_removed_bridges()
     verify_bounded_spawn_queue()
+    verify_registration_and_server_lifecycle()
     java_count = sum(1 for _ in JAVA_ROOT.rglob("*.java"))
-    require(java_count == 87, f"unexpected top-level Java source count: {java_count}")
+    require(java_count == 88, f"unexpected top-level Java source count: {java_count}")
     print(f"[runtime-boundary] PASS: version={EXPECTED_VERSION}, javaSources={java_count}")
 
 

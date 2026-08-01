@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.1.11-raid-spawn-persistence-beta"
+version="0.9.1.12-raid-registration-lifecycle-hotfix"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.1.11 persists validated bounded spawn-queue snapshots in existing raid lifecycle metadata. Remaining slots, retry counters, anchors and batch reservations recover after a server restart. Queue limits are available through a clamped server config. Collision, fluid, hazard, support, border and loaded-chunk validation remain authoritative; wave composition and enabled Mixins are unchanged.
+Stage 0.9.1.12 prevents vanilla Raid#joinRaid from inserting patch-owned raiders a second time after the authoritative addFreshEntity commit. Active bounded queues are checkpointed during server shutdown, then process-local raid state is cleared so the next integrated or dedicated server validates and restores the sidecar. Collision, fluid, hazard, support, border and loaded-chunk validation remain authoritative; wave composition and enabled Mixins are unchanged.
 '''
 
 [[mixins]]
