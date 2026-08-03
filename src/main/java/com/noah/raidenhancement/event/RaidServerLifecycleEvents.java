@@ -14,8 +14,8 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
  *
  * <p>The stopping phase checkpoints active work while server state is still
  * available. The stopped phase then discards process-local mirrors without
- * deleting the sidecar, forcing the next integrated or dedicated server to
- * recover from validated persisted data.</p>
+ * deleting save-scoped SavedData, forcing only the same save to recover from
+ * its own validated persisted data.</p>
  */
 public final class RaidServerLifecycleEvents {
     @SubscribeEvent
@@ -27,7 +27,7 @@ public final class RaidServerLifecycleEvents {
     public void onServerStopping(ServerStoppingEvent event) {
         RaidRuntimeRegistry.beginStopping(event.getServer());
         try {
-            RaidExtraWaveController.checkpointBeforeServerStop();
+            RaidExtraWaveController.checkpointBeforeServerStop(event.getServer());
         } finally {
             RaidRuntimeRegistry.checkpoint(event.getServer());
         }

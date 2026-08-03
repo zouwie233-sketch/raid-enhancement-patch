@@ -22,13 +22,13 @@ import net.neoforged.fml.common.Mod;
 /**
  * NeoForge entrypoint for the independent raid enhancement patch.
  *
- * <p>0.9.2.0 introduces a server-scoped runtime lifecycle boundary while preserving
- * the validated 0.9.1.12 raid registration and queue recovery behavior.</p>
+ * <p>0.9.2.1 keeps the server-scoped runtime lifecycle boundary and moves raid lifecycle
+ * recovery metadata from the version-global config directory into per-save SavedData.</p>
  */
 @Mod(RaidEnhancementPatch.MOD_ID)
 public final class RaidEnhancementPatch {
     public static final String MOD_ID = "raid_enhancement_patch";
-    public static final String VERSION = "0.9.2.0-architecture-runtime-context-alpha";
+    public static final String VERSION = "0.9.2.1-cross-save-lifecycle-isolation-alpha";
 
     public RaidEnhancementPatch(IEventBus modEventBus) {
         ModItems.register(modEventBus);
@@ -50,7 +50,7 @@ public final class RaidEnhancementPatch {
         // Compatibility hotfix 0.3.3: debug command registration is disabled.
         // Earlier staged builds compiled Brigadier command descriptors from sandbox stubs,
         // which crashed during world creation in large modpacks.
-        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". ARCH-1.1 server-scoped runtime context is active for lifecycle ownership and diagnostic isolation. Patch-owned raider registration, queue recovery, safe-position authority, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor and Mixin enablement are unchanged. " + GolemBlockRollbackGuard.hotfixMarker() + ".");
+        System.out.println("[Raid Enhancement Patch] Loaded " + VERSION + ". ARCH-1.1 server-scoped runtime context now owns save-scoped SavedData lifecycle persistence and diagnostic isolation. The legacy version-global raid lifecycle sidecar is ignored. Patch-owned raider registration, bounded queue recovery, safe-position authority, BossBar behavior, raid wave counts, settlement keys, rewards, VillageFavor and Mixin enablement are otherwise unchanged. " + GolemBlockRollbackGuard.hotfixMarker() + ".");
     }
 
     /**

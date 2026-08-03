@@ -1,0 +1,50 @@
+Raid Enhancement Patch 0.9.2.1 跨存档隔离测试清单
+
+[安装前]
+[ ] 先使用旧版完成当前仍在进行、且依赖旧全局快照恢复的袭击
+[ ] 完全退出游戏
+[ ] mods 中只保留 0.9.2.1-cross-save-lifecycle-isolation-alpha JAR
+[ ] 不需要删除旧 config/raid_enhancement_patch/raid_session_lifecycle.properties；新版会忽略它
+
+[GitHub 构建]
+[ ] Verify runtime architecture boundary: PASS
+[ ] Test bounded spawn queue contract: PASS
+[ ] Test server-scoped runtime context contract: PASS
+[ ] Test save-scoped lifecycle payload contract: PASS
+[ ] Gradle clean build: PASS
+[ ] 生成 raid_enhancement_patch-0.9.2.1-cross-save-lifecycle-isolation-alpha.jar
+
+[启动]
+[ ] latest.log 显示 0.9.2.1-cross-save-lifecycle-isolation-alpha
+[ ] 启动信息包含 save-scoped SavedData lifecycle persistence
+[ ] 无 SavedData Factory、事件签名、监听器注册或 Context 异常
+
+[同存档恢复]
+[ ] 在存档 A 触发袭击并等待至少一波开始
+[ ] 返回主菜单，确认服务器完成保存
+[ ] saves/<存档A>/data/raid_enhancement_patch_raid_session_lifecycle.dat 已生成
+[ ] 不退出客户端，重新进入存档 A
+[ ] 日志只从当前存档加载 save-scoped lifecycle snapshot
+[ ] 波次、待生成队列和安全生成行为正常
+
+[A → B → A 隔离]
+[ ] 在同一个 Minecraft 客户端进程进入存档 A，然后返回主菜单
+[ ] 进入没有自身测试快照的存档 B
+[ ] 存档 B 不出现 A 的 BossBar、袭击消息、额外袭击者、队列或冷却
+[ ] 存档 B 日志不显示加载 A 的 save-scoped lifecycle snapshot
+[ ] 返回主菜单并再次进入 A，A 自身快照仍可恢复
+[ ] 三个集成服务器均正常 Stopping server、Saving players、All dimensions are saved
+
+[核心玩法回归]
+[ ] 困难 + 不祥 V 最终连续波次数量正常
+[ ] 最终连续波次首批袭击者出现后退出主菜单，再进入时队列正常恢复
+[ ] 无漏刷、重复刷、UUID 重复或提前胜利
+[ ] 安全生成继续阻止墙体、流体、无支撑、越界和未加载区块位置
+[ ] BossBar、结算、奖励和 VillageFavor 行为无变化
+
+[日志]
+[ ] 无 Raid runtime context is closed
+[ ] 无 Raid lifecycle snapshot repository is closed
+[ ] 无 Failed to close server-scoped context
+[ ] 无本 Mod ERROR/FATAL
+[ ] 无新增高频持久化日志

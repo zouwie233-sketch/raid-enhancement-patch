@@ -4,23 +4,19 @@ import com.noah.raidenhancement.config.RaidEnhancementConfig;
 import com.noah.raidenhancement.compat.CachedReflection;
 import com.noah.raidenhancement.compat.MobEffectCompat;
 import com.noah.raidenhancement.integration.RaidsEnhancedIds;
+import com.noah.raidenhancement.persistence.RaidLifecycleSnapshotRepository;
 import com.noah.raidenhancement.raid.runtime.RaidRuntimeView;
+import com.noah.raidenhancement.runtime.RaidRuntimeRegistry;
 import com.noah.raidenhancement.villager.ProtectedVillagerState;
 import com.noah.raidenhancement.villager.RaidAutoVillagerProtector;
 import com.noah.raidenhancement.villager.VillagerProtectionController;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.StandardCopyOption;
 import java.util.Base64;
 import java.util.Properties;
 import java.util.ArrayList;
@@ -146,8 +142,12 @@ public final class RaidExtraWaveController {
      * Persists every active bounded queue before NeoForge tears down the server.
      * This is event-driven and does not add work to the normal tick path.
      */
-    public static void checkpointBeforeServerStop() {
-        ensureLifecycleSnapshotsLoaded();
+    public static void checkpointBeforeServerStop(MinecraftServer server) {
+        if (!RaidEnhancementConfig.RAID_SESSION_LIFECYCLE_PERSISTENCE_ENABLED || server == null) {
+            return;
+        }
+        RaidLifecycleSnapshotRepository repository = lifecycleRepository(server);
+        ensureLifecycleSnapshotsLoaded(repository);
         long latestGameTime = 0L;
         for (ExtraWaveState state : STATES.values()) {
             if (state == null || state.completed) {
@@ -157,7 +157,7 @@ public final class RaidExtraWaveController {
             persistLifecycleSnapshot(state, state.lastSeenGameTime, true);
         }
         if (lifecycleSnapshotsDirty) {
-            saveLifecycleSnapshots(latestGameTime);
+            saveLifecycleSnapshots(repository, latestGameTime);
         }
     }
 
@@ -172,6 +172,9 @@ public final class RaidExtraWaveController {
         lastHudSnapshot = null;
         PERSISTED_LIFECYCLE_SNAPSHOTS.clear();
         lifecycleSnapshotsLoaded = false;
+        announcedLifecyclePersistence = false;
+        warnedLifecyclePersistenceFailure = false;
+        warnedSpawnQueueRestoreRejection = false;
         lifecycleSnapshotsDirty = false;
         lifecyclePersistenceRetryNotBeforeGameTime = 0L;
     }
@@ -182,7 +185,8 @@ public final class RaidExtraWaveController {
         }
         long gameTime = level.getGameTime();
         try {
-            ensureLifecycleSnapshotsLoaded();
+            RaidLifecycleSnapshotRepository repository = lifecycleRepository(level);
+            ensureLifecycleSnapshotsLoaded(repository);
             pruneTerminatedRaidKeys(gameTime);
             pruneStaleHudSnapshots(level, gameTime);
             RaidEncounterAuthority.prune(gameTime, Math.max(RaidEnhancementConfig.RAID_WAVE_HUD_STALE_TICKS,
@@ -214,7 +218,7 @@ public final class RaidExtraWaveController {
             if (processInterval <= 1 || gameTime % Math.max(1, processInterval) == 0L) {
                 processExtraWaveStates(level, gameTime);
             }
-            flushLifecycleSnapshotsIfDirty(gameTime);
+            flushLifecycleSnapshotsIfDirty(repository, gameTime);
         } catch (Throwable throwable) {
             if (!warnedTickFailure) {
                 warnedTickFailure = true;
@@ -4040,19 +4044,14 @@ public final class RaidExtraWaveController {
         return dx * dx + dy * dy + dz * dz;
     }
 
-    private static void ensureLifecycleSnapshotsLoaded() {
+    private static void ensureLifecycleSnapshotsLoaded(RaidLifecycleSnapshotRepository repository) {
         if (lifecycleSnapshotsLoaded || !RaidEnhancementConfig.RAID_SESSION_LIFECYCLE_PERSISTENCE_ENABLED) {
             lifecycleSnapshotsLoaded = true;
             return;
         }
         lifecycleSnapshotsLoaded = true;
-        Path file = lifecyclePersistencePath();
-        if (!Files.isRegularFile(file)) {
-            return;
-        }
-        Properties properties = new Properties();
-        try (InputStream inputStream = Files.newInputStream(file)) {
-            properties.load(inputStream);
+        try {
+            Properties properties = repository.load();
             PERSISTED_LIFECYCLE_SNAPSHOTS.clear();
             String encodedKeys = properties.getProperty("keys", "").trim();
             if (!encodedKeys.isBlank()) {
@@ -4070,9 +4069,9 @@ public final class RaidExtraWaveController {
             if (!announcedLifecyclePersistence && !PERSISTED_LIFECYCLE_SNAPSHOTS.isEmpty()) {
                 announcedLifecyclePersistence = true;
                 System.out.println("[Raid Enhancement Patch] Loaded " + PERSISTED_LIFECYCLE_SNAPSHOTS.size()
-                        + " raid lifecycle snapshot(s) for Step 8.5 metadata recovery.");
+                        + " save-scoped raid lifecycle snapshot(s) for Step 8.5 metadata recovery.");
             }
-        } catch (IOException | RuntimeException exception) {
+        } catch (RuntimeException exception) {
             warnLifecyclePersistence("load", exception);
         }
     }
@@ -4081,7 +4080,6 @@ public final class RaidExtraWaveController {
         if (state == null || !RaidEnhancementConfig.RAID_SESSION_LIFECYCLE_PERSISTENCE_ENABLED) {
             return;
         }
-        ensureLifecycleSnapshotsLoaded();
         PersistedLifecycleSnapshot snapshot = PERSISTED_LIFECYCLE_SNAPSHOTS.get(state.key);
         if (snapshot == null || snapshot.completed()) {
             return;
@@ -4204,7 +4202,6 @@ public final class RaidExtraWaveController {
         if (key == null || key.isBlank() || !RaidEnhancementConfig.RAID_SESSION_LIFECYCLE_PERSISTENCE_ENABLED) {
             return;
         }
-        ensureLifecycleSnapshotsLoaded();
         if (PERSISTED_LIFECYCLE_SNAPSHOTS.remove(key) != null) {
             lifecycleSnapshotsDirty = true;
         }
@@ -4226,24 +4223,21 @@ public final class RaidExtraWaveController {
         }
     }
 
-    private static void flushLifecycleSnapshotsIfDirty(long gameTime) {
+    private static void flushLifecycleSnapshotsIfDirty(RaidLifecycleSnapshotRepository repository, long gameTime) {
         if (!lifecycleSnapshotsDirty || gameTime < lifecyclePersistenceRetryNotBeforeGameTime) {
             return;
         }
-        saveLifecycleSnapshots(gameTime);
+        saveLifecycleSnapshots(repository, gameTime);
     }
 
-    private static void saveLifecycleSnapshots(long gameTime) {
+    private static void saveLifecycleSnapshots(RaidLifecycleSnapshotRepository repository, long gameTime) {
         if (!RaidEnhancementConfig.RAID_SESSION_LIFECYCLE_PERSISTENCE_ENABLED) {
             return;
         }
         try {
-            Path file = lifecyclePersistencePath();
-            Path parent = file.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
             Properties properties = new Properties();
+            properties.setProperty("dataVersion", "1");
+            properties.setProperty("storageScope", "minecraft-server-overworld-saved-data");
             StringBuilder keys = new StringBuilder();
             for (PersistedLifecycleSnapshot snapshot : PERSISTED_LIFECYCLE_SNAPSHOTS.values()) {
                 if (snapshot == null || snapshot.completed()) {
@@ -4257,29 +4251,21 @@ public final class RaidExtraWaveController {
                 snapshot.writeTo(properties, safeKey);
             }
             properties.setProperty("keys", keys.toString());
-            Path tempFile = file.resolveSibling(file.getFileName() + ".tmp");
-            try (OutputStream outputStream = Files.newOutputStream(tempFile)) {
-                properties.store(outputStream, "Raid Enhancement Patch 0.9.1.12 raid lifecycle and spawn queue metadata");
-            }
-            try {
-                Files.move(tempFile, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException exception) {
-                Files.move(tempFile, file, StandardCopyOption.REPLACE_EXISTING);
-            }
+            repository.replace(properties);
             lifecycleSnapshotsDirty = false;
             lifecyclePersistenceRetryNotBeforeGameTime = 0L;
-        } catch (IOException | RuntimeException exception) {
+        } catch (RuntimeException exception) {
             lifecyclePersistenceRetryNotBeforeGameTime = gameTime + 200L;
             warnLifecyclePersistence("save", exception);
         }
     }
 
-    private static Path lifecyclePersistencePath() {
-        String path = RaidEnhancementConfig.RAID_SESSION_LIFECYCLE_PERSISTENCE_FILE;
-        if (path == null || path.isBlank()) {
-            path = "config/raid_enhancement_patch/raid_session_lifecycle.properties";
-        }
-        return Path.of(path);
+    private static RaidLifecycleSnapshotRepository lifecycleRepository(ServerLevel level) {
+        return RaidRuntimeRegistry.require(level).lifecycleSnapshots();
+    }
+
+    private static RaidLifecycleSnapshotRepository lifecycleRepository(MinecraftServer server) {
+        return RaidRuntimeRegistry.require(server).lifecycleSnapshots();
     }
 
     private static String encodeLifecycleKey(String key) {

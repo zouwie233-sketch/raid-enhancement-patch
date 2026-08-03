@@ -1,8 +1,8 @@
 # Raid Enhancement Patch
 
-Current version: `0.9.2.0-architecture-runtime-context-alpha`
+Current version: `0.9.2.1-cross-save-lifecycle-isolation-alpha`
 
-0.9.2.0 begins the approved architecture roadmap with a server-scoped runtime lifecycle boundary. A concrete `MinecraftServer` now owns one `RaidRuntimeContext`; the first migrated state is diagnostic-only so the tested raid wave, queue, registration, safe-spawn, BossBar, settlement and VillageFavor behavior stays unchanged. Starting, stopping, checkpoint and close transitions are explicit, and the diagnostic rate-limit map no longer crosses integrated-server sessions.
+0.9.2.1 closes the cross-save persistence leak found by the A -> B -> A test. A concrete `MinecraftServer` owns one `RaidRuntimeContext`, and that context now owns both diagnostic isolation and a save-scoped lifecycle repository backed by the current save's Overworld `SavedData`. The old version-global `config/raid_enhancement_patch/raid_session_lifecycle.properties` file is never imported automatically. Raid composition, bounded spawn processing, safe-spawn validation, BossBar, settlement and VillageFavor behavior are unchanged.
 
 It introduces one server-level tick coordinator and immutable runtime views for BossBar and battle-support consumers. It removes internal reflection into `RaidExtraWaveController.STATES` and `VillageSecurityController.SESSIONS` without changing gameplay rules.
 

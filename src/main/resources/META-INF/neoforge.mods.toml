@@ -4,12 +4,12 @@ license="All Rights Reserved"
 
 [[mods]]
 modId="raid_enhancement_patch"
-version="0.9.2.0-architecture-runtime-context-alpha"
+version="0.9.2.1-cross-save-lifecycle-isolation-alpha"
 displayName="Raid Enhancement Patch"
 authors="Noah Black / ChatGPT"
 description='''
 Independent NeoForge 1.21.1 patch mod for high-difficulty raid enhancement.
-Stage 0.9.2.0 introduces a server-scoped RaidRuntimeContext lifecycle boundary and isolates diagnostic rate-limit state per concrete MinecraftServer. The validated 0.9.1.12 raid registration, bounded queue recovery, safe-spawn authority, wave composition and enabled Mixins are unchanged.
+Stage 0.9.2.1 stores raid lifecycle and bounded spawn-queue recovery metadata in per-save Overworld SavedData owned through RaidRuntimeContext. The legacy version-global sidecar is ignored, preventing A -> B -> A integrated-server sessions from sharing persisted raid metadata. Validated raid registration, safe-spawn authority, wave composition and enabled Mixins are unchanged.
 '''
 
 [[mixins]]

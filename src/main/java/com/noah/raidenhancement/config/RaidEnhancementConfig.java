@@ -345,11 +345,14 @@ public final class RaidEnhancementConfig {
     public static final boolean RAID_WAVE_HUD_SELECT_NEAREST_RAID = true;
 
     // Step 8.5 / 0.9.1.11: lifecycle recovery. The sidecar restores stable session
-    // metadata and, when enabled, validated remaining queue slots. It never serializes
-    // entities, loads chunks, teleports mobs, clears terrain or mutates raid failure.
+    // metadata and, when enabled, validated remaining queue slots. 0.9.2.1 stores this
+    // in the current save's Overworld SavedData. It never serializes entities, loads
+    // chunks, teleports mobs, clears terrain or mutates raid failure.
     public static final boolean RAID_SESSION_LIFECYCLE_PERSISTENCE_ENABLED = true;
     public static final int RAID_SESSION_LIFECYCLE_PERSIST_INTERVAL_TICKS = 200;
     public static final int RAID_SESSION_LIFECYCLE_RESTORE_TTL_TICKS = 24000;
+    /** Compatibility marker only. 0.9.2.1 never reads or writes this version-global path. */
+    @Deprecated(forRemoval = true)
     public static final String RAID_SESSION_LIFECYCLE_PERSISTENCE_FILE = "config/raid_enhancement_patch/raid_session_lifecycle.properties";
 
     public static final int EXTRA_WAVE_BRIDGE_HUD_HOLD_TICKS = 1200;

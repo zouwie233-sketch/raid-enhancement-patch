@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static architecture and raid registration contracts for 0.9.2.0."""
+"""Static architecture, persistence isolation and raid registration contracts for 0.9.2.1."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 JAVA_ROOT = ROOT / "src/main/java/com/noah/raidenhancement"
-EXPECTED_VERSION = "0.9.2.0-architecture-runtime-context-alpha"
+EXPECTED_VERSION = "0.9.2.1-cross-save-lifecycle-isolation-alpha"
 
 
 def require(condition: bool, message: str) -> None:
@@ -113,8 +113,10 @@ def verify_bounded_spawn_queue() -> None:
             "spawn queue does not checkpoint event-driven changes")
     require("nativeRaidNumericId" in key_service and "differentNativeRaid" in controller,
             "stable native raid identity guard is missing")
-    require("StandardCopyOption.ATOMIC_MOVE" in controller and "lifecycleSnapshotsDirty" in controller,
-            "atomic/coalesced lifecycle persistence is missing")
+    require("RaidLifecycleSnapshotRepository" in controller
+            and "repository.replace(properties);" in controller
+            and "lifecycleSnapshotsDirty" in controller,
+            "save-scoped/coalesced lifecycle persistence is missing")
     require("raid_spawn_queue.properties" in config and "1, 32" in config and "1, 128" in config,
             "clamped server spawn-queue config is missing")
     for safety_check in ["hasChunkAt", "isWithinBounds", "noCollision", "containsFluidOrHazard", "hasStableSupport"]:
@@ -127,7 +129,8 @@ def verify_registration_and_server_lifecycle() -> None:
     controller = text(JAVA_ROOT / "raid/RaidExtraWaveController.java")
     require("new RaidServerLifecycleEvents()" in entrypoint,
             "server lifecycle listener is not registered")
-    require("ServerStoppingEvent" in lifecycle and "checkpointBeforeServerStop();" in lifecycle,
+    require("ServerStoppingEvent" in lifecycle
+            and "checkpointBeforeServerStop(event.getServer());" in lifecycle,
             "stopping event does not checkpoint active queues")
     require("ServerStartingEvent" in lifecycle and "RaidRuntimeRegistry.start(event.getServer());" in lifecycle,
             "starting event does not create the server-scoped runtime context")
@@ -157,18 +160,46 @@ def verify_server_scoped_context() -> None:
     diagnostics = text(JAVA_ROOT / "runtime/RaidDiagnosticsContext.java")
     store = text(JAVA_ROOT / "runtime/ServerScopedContextStore.java")
     key_diagnostics = text(JAVA_ROOT / "raid/RaidKeyDiagnostics.java")
+    repository = text(JAVA_ROOT / "persistence/RaidLifecycleSnapshotRepository.java")
     require("IdentityHashMap" in store and "closeAndRemove" in store,
             "server context store is not identity-scoped or explicitly removable")
     require("ServerScopedContextStore<MinecraftServer, RaidRuntimeContext>" in registry,
             "runtime registry is not scoped by concrete MinecraftServer")
     require("RaidDiagnosticsContext diagnostics" in context and "diagnostics.close();" in context,
             "runtime context does not own and release diagnostic state")
+    require("RaidLifecycleSnapshotRepository lifecycleSnapshots" in context
+            and "lifecycleSnapshots.close();" in context,
+            "runtime context does not own and release save-scoped lifecycle persistence")
     require("MAX_RATE_LIMIT_ENTRIES = 512" in diagnostics and "lastLogByEventAndKey.clear();" in diagnostics,
             "diagnostic state is not bounded or cleared")
     require("RaidRuntimeRegistry.require(serverLevel).diagnostics()" in key_diagnostics,
             "key diagnostics still bypasses the server-scoped diagnostic owner")
     require("LAST_LOG_BY_EVENT_AND_KEY" not in key_diagnostics,
             "legacy process-global key diagnostic rate-limit map remains")
+    require("private MinecraftServer server;" in repository and "server = null;" in repository,
+            "lifecycle repository retains its concrete server after close")
+
+
+def verify_save_scoped_lifecycle_persistence() -> None:
+    controller = text(JAVA_ROOT / "raid/RaidExtraWaveController.java")
+    repository = text(JAVA_ROOT / "persistence/RaidLifecycleSnapshotRepository.java")
+    saved_data = text(JAVA_ROOT / "persistence/RaidLifecycleSavedData.java")
+    codec = text(JAVA_ROOT / "persistence/RaidLifecyclePropertiesCodec.java")
+    require("extends SavedData" in saved_data and "setDirty();" in saved_data,
+            "raid lifecycle metadata is not backed by dirty-tracked Minecraft SavedData")
+    require("currentServer.overworld()" in repository
+            and "getDataStorage().computeIfAbsent" in repository,
+            "raid lifecycle SavedData is not attached to the current save's Overworld")
+    require('DATA_FILE_ID = "raid_enhancement_patch_raid_session_lifecycle"' in repository,
+            "save-scoped lifecycle data id drifted")
+    require("MAX_PAYLOAD_BYTES = 4 * 1024 * 1024" in codec,
+            "SavedData payload no longer has a hard safety bound")
+    require("lifecyclePersistencePath" not in controller
+            and "RAID_SESSION_LIFECYCLE_PERSISTENCE_FILE" not in controller
+            and "config/raid_enhancement_patch/raid_session_lifecycle.properties" not in repository,
+            "legacy version-global lifecycle sidecar is still a runtime persistence source")
+    require('properties.setProperty("storageScope", "minecraft-server-overworld-saved-data")' in controller,
+            "persisted lifecycle payload does not declare its save scope")
 
 
 def main() -> None:
@@ -180,8 +211,9 @@ def main() -> None:
     verify_bounded_spawn_queue()
     verify_registration_and_server_lifecycle()
     verify_server_scoped_context()
+    verify_save_scoped_lifecycle_persistence()
     java_count = sum(1 for _ in JAVA_ROOT.rglob("*.java"))
-    require(java_count == 92, f"unexpected top-level Java source count: {java_count}")
+    require(java_count == 95, f"unexpected top-level Java source count: {java_count}")
     print(f"[runtime-boundary] PASS: version={EXPECTED_VERSION}, javaSources={java_count}")
 
 

@@ -1,5 +1,6 @@
 package com.noah.raidenhancement.runtime;
 
+import com.noah.raidenhancement.persistence.RaidLifecycleSnapshotRepository;
 import net.minecraft.server.MinecraftServer;
 
 import java.util.Objects;
@@ -7,19 +8,21 @@ import java.util.Objects;
 /**
  * Lifecycle and dependency boundary for one concrete Minecraft server.
  *
- * <p>The context intentionally owns no raid gameplay state in ARCH-1.1. Its first migrated
- * component is diagnostic-only, proving server isolation before any authoritative encounter
- * state is moved out of the legacy controllers.</p>
+ * <p>The context owns server-lifetime infrastructure only. Gameplay decisions remain in
+ * their domain controllers; diagnostics and save-scoped lifecycle persistence are composed
+ * here so they cannot outlive or cross their concrete server.</p>
  */
 public final class RaidRuntimeContext implements AutoCloseable {
     private final int serverIdentity;
     private final RaidDiagnosticsContext diagnostics = new RaidDiagnosticsContext();
+    private final RaidLifecycleSnapshotRepository lifecycleSnapshots;
     private boolean stopping;
     private boolean closed;
 
     RaidRuntimeContext(MinecraftServer server) {
         Objects.requireNonNull(server, "server");
         this.serverIdentity = System.identityHashCode(server);
+        this.lifecycleSnapshots = new RaidLifecycleSnapshotRepository(server);
     }
 
     public synchronized int serverIdentity() {
@@ -29,6 +32,11 @@ public final class RaidRuntimeContext implements AutoCloseable {
     public synchronized RaidDiagnosticsContext diagnostics() {
         ensureOpen();
         return diagnostics;
+    }
+
+    public synchronized RaidLifecycleSnapshotRepository lifecycleSnapshots() {
+        ensureOpen();
+        return lifecycleSnapshots;
     }
 
     public synchronized void beginStopping() {
@@ -45,9 +53,9 @@ public final class RaidRuntimeContext implements AutoCloseable {
         return closed;
     }
 
-    /** Reserved checkpoint boundary; no durable component is migrated in ARCH-1.1. */
     public synchronized void checkpoint() {
         ensureOpen();
+        lifecycleSnapshots.checkpoint();
     }
 
     @Override
@@ -56,8 +64,12 @@ public final class RaidRuntimeContext implements AutoCloseable {
             return;
         }
         stopping = true;
-        diagnostics.close();
-        closed = true;
+        try {
+            lifecycleSnapshots.close();
+        } finally {
+            diagnostics.close();
+            closed = true;
+        }
     }
 
     private void ensureOpen() {

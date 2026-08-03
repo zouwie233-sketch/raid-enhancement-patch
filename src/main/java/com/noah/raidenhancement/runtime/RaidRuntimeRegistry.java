@@ -24,6 +24,13 @@ public final class RaidRuntimeRegistry {
         return start(level.getServer());
     }
 
+    public static RaidRuntimeContext require(MinecraftServer server) {
+        if (server == null) {
+            throw new IllegalArgumentException("Minecraft server is required");
+        }
+        return start(server);
+    }
+
     public static Optional<RaidRuntimeContext> find(MinecraftServer server) {
         return CONTEXTS.find(server);
     }
